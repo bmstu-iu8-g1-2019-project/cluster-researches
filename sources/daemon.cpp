@@ -3,16 +3,36 @@
 #include <thread>
 
 #include <membertable.hpp>
-#include <gossip_behavior.hpp>
+#include <behavior.hpp>
 
 int main() {
     MemberTable table;
 
-    std::thread gossip(Gossiping, std::ref(table));
-    std::thread application{AppBridging, std::ref(table)};
+    int sd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sd == -1)
+        throw std::runtime_error{
+            "Socket opening error"
+        };
 
-    gossip.join();
+    struct sockaddr_in host_addr = {};
+    host_addr.sin_family = AF_INET;
+    host_addr.sin_addr.s_addr = INADDR_ANY;
+    host_addr.sin_port = gossip_port;
+
+    if (bind(sd, (const sockaddr*) &host_addr, sizeof(host_addr)) == -1) {
+        close(sd);
+        throw std::runtime_error{
+            "Gossip socket bind error"
+        };
+    }
+
+    std::thread application{AppBridging, std::ref(table)};
+    std::thread gossiping{Gossiping, sd, std::ref(table)};
+
     application.join();
+    gossiping.join();
+
+    close(sd);
 
     return 0;
 }

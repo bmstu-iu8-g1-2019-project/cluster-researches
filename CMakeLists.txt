@@ -34,8 +34,8 @@ target_link_libraries(table PUBLIC nlohmann_json::nlohmann_json)
 
 
 add_library(behavior STATIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/sources/app_bridge.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/sources/gossip_behavior.cpp)
+        ${CMAKE_CURRENT_SOURCE_DIR}/sources/behavior.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sources/gossiping.cpp)
 target_include_directories(behavior
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers/)
 target_link_libraries(behavior PUBLIC table)

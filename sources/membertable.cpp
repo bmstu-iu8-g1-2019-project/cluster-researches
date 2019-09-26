@@ -2,20 +2,21 @@
 
 #include <membertable.hpp>
 
+
 nlohmann::json MemberAddr::ToJson() const {
     nlohmann::json json;
-    json["ip"] = IP;
+    json["ip"] = inet_ntoa(IP);
     json["port"] = Port;
 
     return json;
 }
 
 size_t MemberAddr::Hasher::operator()(const MemberAddr& key) const {
-    return std::hash<uint32_t>{}(key.IP) ^
+    return std::hash<uint32_t>{}(key.IP.s_addr) ^
            (std::hash<uint16_t>{}(key.Port) << 1);
 }
 bool operator==(const MemberAddr& lhs, const MemberAddr& rhs) {
-    return lhs.IP == rhs.IP && lhs.Port == rhs.Port;
+    return lhs.IP.s_addr == rhs.IP.s_addr && lhs.Port == rhs.Port;
 }
 
 nlohmann::json MemberInfo::ToJson() const {

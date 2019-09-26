@@ -6,17 +6,21 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <netinet/in.h>
 #include <unistd.h>
 
 #include <stdexcept>
+#include <thread>
 
 #include <membertable.hpp>
+#include <gossiping.hpp>
 
-// It will be env variable in future
+// It will be env variables in future
 std::string socket_file{"/tmp/app.socket"};
+uint16_t gossip_port = 80;
 
-void AppBridging(MemberTable& table);
+void AppBridging(int sd, MemberTable& table);
 
-void Gossiping(MemberTable& table);
+void Gossiping(int sd, MemberTable& table);
 
 #endif // HEADERS_BEHAVIOR_HPP_

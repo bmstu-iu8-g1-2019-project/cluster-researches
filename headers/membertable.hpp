@@ -3,6 +3,8 @@
 #ifndef SOURCES_MEMBERTABLE_HPP_
 #define SOURCES_MEMBERTABLE_HPP_
 
+#include <arpa/inet.h>
+
 #include <algorithm>
 #include <deque>
 #include <mutex>
@@ -13,8 +15,8 @@
 #include <nlohmann/json.hpp>
 
 struct MemberAddr {
-    uint32_t IP;
-    uint16_t Port;
+    in_addr IP;
+    in_port_t Port;
 
     struct Hasher {
         size_t operator()(const MemberAddr& key) const;
