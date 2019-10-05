@@ -2,25 +2,7 @@
 
 #include <behavior.hpp>
 
-void AppBridging(MemberTable& table) {
-    int sd = socket(AF_UNIX, SOCK_DGRAM, 0);
-    if (sd == -1)
-        throw std::runtime_error {
-                "Could not open application socket"
-        };
-
-    sockaddr_un addr{};
-    addr.sun_family = AF_UNIX;
-    unlink(socket_file.c_str());
-    std::copy(socket_file.cbegin(), socket_file.cend(), &addr.sun_path);
-
-    if (bind(sd, (sockaddr*) &addr, sizeof(addr)) == -1) {
-        close(sd);
-        throw std::runtime_error {
-                "Could not bind application socket"
-        };
-    }
-
+void AppBridging(int sd, MemberTable& table) {
     while (42) {
         listen(sd, 1);
 
@@ -40,10 +22,10 @@ void AppBridging(MemberTable& table) {
 }
 
 void Gossiping(int sd, MemberTable& table) {
-    // Make here container with relevant self-gossips
+    // TODO(AndreevSemen): Make here thread-shared container with relevant self-gossips
 
-    std::thread self{SelfGossiping, sd, std::ref(table)};
-    std::thread outside{OutsideGossiping, sd, std::ref(table)};
+    std::thread self{FailureDetection, sd, std::ref(table)};
+    std::thread outside{Distribution, sd, std::ref(table)};
 
     self.join();
     outside.join();

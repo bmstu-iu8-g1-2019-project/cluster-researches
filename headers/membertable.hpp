@@ -27,11 +27,14 @@ struct MemberAddr {
 
 bool operator==(const MemberAddr& lhs, const MemberAddr& rhs);
 
+// TODO(AndreevSemen): Incomplete struct
 struct MemberInfo {
     std::string State;
     uint32_t Generation;
 
     nlohmann::json ToJson() const;
+
+    bool operator==(const MemberInfo& rhs) const;
 };
 
 struct Member {
@@ -39,6 +42,8 @@ struct Member {
     MemberInfo Info;
 
     nlohmann::json ToJson() const;
+
+    bool operator==(const Member& rhs) const;
 };
 
 
@@ -48,7 +53,7 @@ private:
     mutable std::mutex mutex_;
 
 public:
-    MemberTable();
+    MemberTable() = default;
     MemberTable(const MemberTable& rhs);
 
     nlohmann::json ToJson() const;
@@ -56,6 +61,7 @@ public:
     std::deque<MemberAddr> GenerateRoundQueue() const;
     MemberTable GetSubset(size_t size) const;
 
+    Member operator[](const MemberAddr& addr) const;
     bool IsExist(const MemberAddr& addr) const;
 
     void Insert(const Member& member);

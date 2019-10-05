@@ -60,28 +60,47 @@ TEST(MemberTable, Update) {
 TEST(MemberTable, RoundQueueAndSubset) {
     MemberTable table;
 
-    MemberAddr addr1{inet_addr("127.0.0.1"), 80};
-    MemberAddr addr2{inet_addr("127.0.0.1"), 81};
-    MemberAddr addr3{inet_addr("127.0.0.2"), 81};
-    MemberAddr addr4{inet_addr("127.0.0.2"), 82};
-    MemberAddr addr5{inet_addr("127.0.0.3"), 82};
+    std::vector<MemberAddr> addresses = {
+            MemberAddr{inet_addr("127.0.0.1"), 80},
+            MemberAddr{inet_addr("127.0.0.1"), 81},
+            MemberAddr{inet_addr("127.0.0.2"), 81},
+            MemberAddr{inet_addr("127.0.0.2"), 82},
+            MemberAddr{inet_addr("127.0.0.3"), 82}
+    };
 
-    MemberInfo info1{"alive", 0};
-    MemberInfo info2{"alive", 1};
-    MemberInfo info3{"alive", 2};
-    MemberInfo info4{"alive", 3};
-    MemberInfo info5{"alive", 4};
+    std::vector<MemberInfo> infos = {
+            MemberInfo{"alive", 0},
+            MemberInfo{"alive", 1},
+            MemberInfo{"alive", 2},
+            MemberInfo{"alive", 3},
+            MemberInfo{"alive", 4}
+    };
 
-    table.Insert(Member{addr1, info1});
-    table.Insert(Member{addr2, info2});
-    table.Insert(Member{addr3, info3});
-    table.Insert(Member{addr4, info4});
-    table.Insert(Member{addr5, info5});
+    for (size_t i = 0; i < addresses.size() && i < infos.size(); ++i) {
+        table.Insert(Member{addresses[i], infos[i]});
+    }
 
     auto firstQueue = table.GenerateRoundQueue();
     auto secondQueue = table.GenerateRoundQueue();
 
     EXPECT_NE(firstQueue, secondQueue);
 
-    std::cout << table.GetSubset(3).ToJson() << std::endl;
+    MemberTable subset = table.GetSubset(3);
+    EXPECT_EQ(subset.Size(), 3);
+
+    size_t counter = 0;
+    std::vector<Member> existsMembers;
+    for (const auto& addr : addresses) {
+        if (subset.IsExist(addr)) {
+            existsMembers.push_back(subset[addr]);
+            ++counter;
+        }
+    }
+
+    EXPECT_EQ(counter, 3);
+    EXPECT_EQ(existsMembers.size(), 3);
+
+    for (const auto& member : existsMembers) {
+        EXPECT_EQ(member, table[member.Addr]);
+    }
 }

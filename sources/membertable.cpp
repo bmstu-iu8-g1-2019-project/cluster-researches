@@ -27,6 +27,10 @@ nlohmann::json MemberInfo::ToJson() const {
     return json;
 }
 
+bool MemberInfo::operator==(const MemberInfo &rhs) const {
+    return State == rhs.State && Generation == rhs.Generation;
+}
+
 nlohmann::json Member::ToJson() const {
     nlohmann::json json;
     json["addr"] = Addr.ToJson();
@@ -35,7 +39,9 @@ nlohmann::json Member::ToJson() const {
     return json;
 }
 
-MemberTable::MemberTable() {}
+bool Member::operator==(const Member& rhs) const {
+    return Addr == rhs.Addr && Info == rhs.Info;
+}
 
 MemberTable::MemberTable(const MemberTable& rhs)
   : table_{rhs.table_}
@@ -54,12 +60,12 @@ nlohmann::json MemberTable::ToJson() const {
 
 std::deque<MemberAddr> MemberTable::GenerateRoundQueue() const {
     std::deque<MemberAddr> deque;
-    {
-        std::lock_guard<std::mutex> lock{mutex_};
-        for (const auto &member : table_) {
-            deque.push_back(member.first);
-        }
+
+    std::unique_lock<std::mutex> lock(mutex_);
+    for (const auto &member : table_) {
+        deque.push_back(member.first);
     }
+    lock.unlock();
 
     std::random_device rng{};
     std::mt19937 generator{rng()};
@@ -77,6 +83,11 @@ MemberTable MemberTable::GetSubset(size_t size) const {
         subset.Insert(Member{randomQueue[i], table_.find(randomQueue[i])->second});
 
     return subset;
+}
+
+Member MemberTable::operator[](const MemberAddr& addr) const {
+    std::lock_guard<std::mutex> lock{mutex_};
+    return Member{addr, table_.find(addr)->second};
 }
 
 bool MemberTable::IsExist(const MemberAddr& addr) const {

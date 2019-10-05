@@ -38,7 +38,7 @@ add_library(behavior STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/sources/gossiping.cpp)
 target_include_directories(behavior
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers/)
-target_link_libraries(behavior PUBLIC table)
+target_link_libraries(behavior PUBLIC table ${CMAKE_THREAD_LIBS_INIT})
 
 
 add_executable(tests
@@ -52,7 +52,7 @@ add_executable(${CMAKE_PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/sources/daemon.cpp)
 target_include_directories(${CMAKE_PROJECT_NAME}
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers/)
-target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC behavior)
+target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC behavior ${CMAKE_THREAD_LIBS_INIT})
 
 
 enable_testing()

@@ -9,12 +9,32 @@
 #include <unistd.h>
 
 #include <membertable.hpp>
+#include <behavior.hpp>
 
 // It will be env variables in future
 size_t max_connections = 10;
 
-void SelfGossiping(int sd, MemberTable& table);
+void FailureDetection(int sd, MemberTable& table);
 
-void OutsideGossiping(int sd, MemberTable& table);
+void Distribution(int sd, MemberTable& table);
+
+
+// TODO(AndreevSemen): Incomplete class
+class Gossip {
+    MemberAddr initiator;
+    MemberTable subSet;
+
+};
+
+/*
+ * Temporary magic-fairy functions
+ * TODO(AndreevSemen): Realize them!
+ */
+Gossip RecvGossip(int sd);
+void SendGossip(int sd, const MemberAddr& dest, const Gossip& gossip);
+
+void Update(MemberTable& table, const Gossip& gossip);
+Gossip CreatePingMsg(const MemberTable& table, const MemberAddr& dest);
+Gossip CreateAckMsg(const MemberTable& table, const Gossip& request)
 
 #endif // GOSSIPING_GOSSIPING_HPP_
