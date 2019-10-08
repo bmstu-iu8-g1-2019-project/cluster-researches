@@ -2,31 +2,33 @@
 
 #include <behavior.hpp>
 
-void AppCommunicator(int sd, MemberTable& table) {
-    while (42) {
-        listen(sd, 1);
+int SetupSocket(in_port_t port) {
+    int sd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sd == -1)
+        return -1;
 
-        int app_sd = accept(sd,nullptr, nullptr);
-        if (app_sd == -1) {
-            close(sd);
-            throw std::runtime_error{
-                "Could not accept application request"
-            };
-        }
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(port);
 
-        std::string json{table.ToJson().dump()};
-        send(app_sd, json.c_str(), json.size(), 0);
-
-        close(app_sd);
+    if (bind(sd, (sockaddr*) &addr, sizeof(addr)) == -1) {
+        return -1;
     }
+
+    return sd;
 }
 
-void Gossiping(int sd, MemberTable& table) {
-    std::deque<Gossip> discoveredGossips;
+void GossipsCatching(int sd, size_t listenQueueLength, GossipQueue& queue) {
+    size_t buffSize = 1500;
+    byte inBuff[1500]{};
+    while (true) {
+        listen(sd, listenQueueLength);
 
-    std::thread self{FailureDetection, sd, std::ref(table), std::ref(discoveredGossips)};
-    std::thread outside{Distribution, sd, std::ref(table), std::ref(discoveredGossips)};
+        sockaddr_in addr{};
+        size_t msgLength = recvfrom(sd, inBuff, buffSize, 0, (sockaddr*) &addr, nullptr);
 
-    self.join();
-    outside.join();
+
+
+    }
 }

@@ -11,13 +11,19 @@
 
 #include <stdexcept>
 #include <thread>
+#include <queue>
 
 #include <types.hpp>
-#include <membertable.hpp>
-#include <gossiping.hpp>
 
-void AppCommunicator(int sd, MemberTable& table);
+constexpr size_t UDPHeaderLength = 8;
 
-void Gossiping(int sd, MemberTable& table);
+using GossipQueue = std::queue<Gossip>;
+
+int SetupSocket(in_port_t port);
+void GossipsCatching(int sd, size_t listenQueueLength, GossipQueue& queue);
+void UpdateTable(MemberTable& table, GossipQueue& queue);
+std::vector<Gossip> GenerateGossips(MemberTable& table);
+void SendGossip(int sd, const Gossip& gossip);
+
 
 #endif // HEADERS_BEHAVIOR_HPP_

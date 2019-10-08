@@ -27,31 +27,31 @@ find_package(nlohmann_json CONFIG REQUIRED)
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=c++11 -pthread")
 
 add_library(table STATIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/sources/membertable.cpp)
+        ${CMAKE_CURRENT_SOURCE_DIR}/sources/membertable.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sources/types.cpp)
 target_include_directories(table
-        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers/)
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers)
 target_link_libraries(table PUBLIC nlohmann_json::nlohmann_json)
 
 
 add_library(behavior STATIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/sources/behavior.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/sources/gossiping.cpp)
+        ${CMAKE_CURRENT_SOURCE_DIR}/sources/behavior.cpp)
 target_include_directories(behavior
-        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers/)
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers)
 target_link_libraries(behavior PUBLIC table ${CMAKE_THREAD_LIBS_INIT})
 
 
-add_executable(tests
+add_executable(membertable_unittests
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/membertable_unittests.cpp)
-target_include_directories(tests
-        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers/)
-target_link_libraries(tests PUBLIC GTest::main table)
+target_include_directories(membertable_unittests
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers)
+target_link_libraries(membertable_unittests PUBLIC GTest::main table)
 
 
 add_executable(${CMAKE_PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/sources/daemon.cpp)
 target_include_directories(${CMAKE_PROJECT_NAME}
-        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers/)
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers)
 target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC behavior ${CMAKE_THREAD_LIBS_INIT})
 
 
