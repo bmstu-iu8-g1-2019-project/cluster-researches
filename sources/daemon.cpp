@@ -9,31 +9,28 @@ int SetupUnixSocket(const std::string& path);
 int SetupUDPSocket(in_port_t port);
 
 int main() {
-    MemberTable table;
-
+    // Setting up external links
     int app_sd = SetupUnixSocket(socket_file);
     int gossip_sd;
     try {
         gossip_sd = SetupUDPSocket(gossip_port);
     } catch (...) {
         close(app_sd);
-
         throw;
     }
 
-    std::thread application{AppBridging, app_sd, std::ref(table)};
-    std::thread gossiping{Gossiping, gossip_sd, std::ref(table)};
+    MemberTable table;
+    std::thread appLinkingThread{AppCommunicator, app_sd, std::ref(table)};
+    std::thread gossipingThread{Gossiping, gossip_sd, std::ref(table)};
 
     try {
-        application.join();
-        gossiping.join();
+        appLinkingThread.join();
+        gossipingThread.join();
     } catch (...) {
         close(app_sd);
         close(gossip_sd);
-
         throw;
     }
-
     close(app_sd);
     close(gossip_sd);
 

@@ -1,7 +1,7 @@
 // Copyright 2019 AndreevSemen semen.andreev00@mail.ru
 
-#ifndef SOURCES_MEMBERTABLE_HPP_
-#define SOURCES_MEMBERTABLE_HPP_
+#ifndef HEADERS_MEMBERTABLE_HPP_
+#define HEADERS_MEMBERTABLE_HPP_
 
 #include <arpa/inet.h>
 
@@ -71,4 +71,4 @@ public:
     size_t Size() const;
 };
 
-#endif // SOURCES_MEMBERTABLE_HPP_
+#endif // HEADERS_MEMBERTABLE_HPP_

@@ -12,15 +12,11 @@
 #include <stdexcept>
 #include <thread>
 
+#include <types.hpp>
 #include <membertable.hpp>
 #include <gossiping.hpp>
 
-// It will be env variables in future
-std::string socket_file{"/tmp/app.socket"};
-in_port_t gossip_port = 80;
-size_t spread_num = 4;
-
-void AppBridging(int sd, MemberTable& table);
+void AppCommunicator(int sd, MemberTable& table);
 
 void Gossiping(int sd, MemberTable& table);
 

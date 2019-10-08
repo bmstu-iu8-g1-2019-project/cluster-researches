@@ -2,7 +2,7 @@
 
 #include <behavior.hpp>
 
-void AppBridging(int sd, MemberTable& table) {
+void AppCommunicator(int sd, MemberTable& table) {
     while (42) {
         listen(sd, 1);
 
@@ -10,7 +10,7 @@ void AppBridging(int sd, MemberTable& table) {
         if (app_sd == -1) {
             close(sd);
             throw std::runtime_error{
-                "Could not accept application"
+                "Could not accept application request"
             };
         }
 
@@ -22,10 +22,10 @@ void AppBridging(int sd, MemberTable& table) {
 }
 
 void Gossiping(int sd, MemberTable& table) {
-    // TODO(AndreevSemen): Make here thread-shared container with relevant self-gossips
+    std::deque<Gossip> discoveredGossips;
 
-    std::thread self{FailureDetection, sd, std::ref(table)};
-    std::thread outside{Distribution, sd, std::ref(table)};
+    std::thread self{FailureDetection, sd, std::ref(table), std::ref(discoveredGossips)};
+    std::thread outside{Distribution, sd, std::ref(table), std::ref(discoveredGossips)};
 
     self.join();
     outside.join();
