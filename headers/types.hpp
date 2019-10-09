@@ -38,14 +38,27 @@ struct Member;
 struct MemberTable;
 struct Gossip;
 
-// Any class deriving this one could be converted to bytes
+
+// Any class deriving this could be able converted to bytes
 struct ByteTranslatable {
     virtual byte* InsertToBytes(byte* bBegin, byte* bEnd) const = 0;
 };
 
+template < typename Type >
+byte* InsertNumberToBytes(byte* bBegin, byte* bEnd, Type number) {
+    if (std::distance(bEnd, bBegin)  < sizeof(number))
+        return nullptr;
+
+    *reinterpret_cast<Type*>(bBegin) = number;
+
+    return bBegin + sizeof(Type);
+}
+
+
 struct TimeStamp {
     uint32_t Time;
 };
+
 
 struct MemberAddr {
     in_addr IP;
@@ -73,6 +86,7 @@ struct MemberInfo {
     bool operator==(const MemberInfo& rhs) const;
 };
 
+
 // Here keeps all information about node
 struct Member : public ByteTranslatable {
 public:
@@ -89,6 +103,7 @@ public:
     bool operator==(const Member& rhs) const;
 };
 
+
 class MemberTable : public ByteTranslatable {
 private:
     std::unordered_map<MemberAddr, MemberInfo, MemberAddr::Hasher> table_;
@@ -99,12 +114,47 @@ public:
 
     byte* InsertToBytes(byte* bBegin, byte* bEnd) const override;
 
-    void Update(const Gossip& gossip);
     size_t Size() const;
+
+    void Update(const Gossip& gossip);
 };
 
+
+/* Gossip  -------------------------> 2 + 18 * (1 + 1 + EventsSize + TableSize)
+ * |
+ * |__TTL   (uint16_t)             -> 2 B
+ * |
+ * |__Owner (Member)               -> 18 B
+ * |
+ * |__Dest  (Member)               -> 18 B
+ * |
+ * |__Events (std::vector<Member>) -> 18 B * EventsSize
+ * |  |
+ * |  |__Member[0]
+ * |  |__Member[1]
+ * |   ......
+ * |   ......
+ * |  |__Member[size - 2]
+ * |  |__Member[size - 1]
+ * |
+ * |__Table (MemberTable)          -> 18 B * TableSize
+ *    |_______________________________
+ *    | MemberAddr[0] | MemberInfo[0] |
+ *    | MemberAddr[0] | MemberInfo[0] |
+ *              .............
+ *              .............
+ *              .............
+ *    | MemberAddr[0] | MemberInfo[0] |
+ *    | MemberAddr[0] | MemberInfo[0] |
+ *    |_______________________________|
+ *
+ * */
+
+
 struct Gossip : public ByteTranslatable {
-    Member GossipOwner;
+    uint16_t TTL = 0;
+    Member Owner;
+    Member Dest;
     std::vector<Member> Events;
     MemberTable Table;
 
@@ -114,6 +164,8 @@ struct Gossip : public ByteTranslatable {
     bool Read(const byte* bBegin, const byte *bEnd);
 
     byte* InsertToBytes(byte* bBegin, byte* bEnd) const override;
+
+    size_t ByteSize() const;
 };
 
 #endif // HEADERS_TYPES_HPP_

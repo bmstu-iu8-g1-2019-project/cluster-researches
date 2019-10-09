@@ -6,6 +6,7 @@
 #include <behavior.hpp>
 
 int main() {
+
     // TODO(AndreevSemen) : Change port for env variable
     int sd = SetupSocket(80);
     if (sd == -1) throw std::runtime_error{

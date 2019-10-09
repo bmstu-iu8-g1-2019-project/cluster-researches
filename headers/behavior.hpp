@@ -12,12 +12,19 @@
 #include <stdexcept>
 #include <thread>
 #include <queue>
+#include <mutex>
 
 #include <types.hpp>
 
-constexpr size_t UDPHeaderLength = 8;
+class GossipQueue {
+private:
+    std::queue<Gossip> queue_;
+    std::mutex mutex_;
 
-using GossipQueue = std::queue<Gossip>;
+public:
+    void Push(const Gossip& gossip);
+    bool SafetyPop(Gossip& gossip);
+};
 
 int SetupSocket(in_port_t port);
 void GossipsCatching(int sd, size_t listenQueueLength, GossipQueue& queue);
