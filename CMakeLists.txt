@@ -31,26 +31,40 @@ add_library(types STATIC
 target_include_directories(types
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers)
 
+add_library(buffer STATIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/sources/buffer.cpp)
+target_include_directories(buffer
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers)
 
 add_library(behavior STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/sources/behavior.cpp)
 target_include_directories(behavior
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers)
-target_link_libraries(behavior PUBLIC types ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(behavior
+        PUBLIC types buffer ${CMAKE_THREAD_LIBS_INIT})
 
 
 add_executable(type_translation_unittests
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/type_translation_unittests.cpp)
 target_include_directories(type_translation_unittests
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers)
-target_link_libraries(type_translation_unittests PUBLIC GTest::main types)
+target_link_libraries(type_translation_unittests
+        PUBLIC GTest::main types buffer)
+
+
+add_executable(table_unittests
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/table_unittests.cpp)
+target_include_directories(table_unittests
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers)
+target_link_libraries(table_unittests
+        PUBLIC GTest::main types)
 
 
 add_executable(${CMAKE_PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/sources/daemon.cpp)
 target_include_directories(${CMAKE_PROJECT_NAME}
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers)
-target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC behavior ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC behavior buffer ${CMAKE_THREAD_LIBS_INIT})
 
 
 enable_testing()

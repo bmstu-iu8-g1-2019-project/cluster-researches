@@ -5,24 +5,26 @@
 
 #include <behavior.hpp>
 
-int main() {
 
+int main() {
     // TODO(AndreevSemen) : Change port for env variable
     int sd = SetupSocket(80);
     if (sd == -1) throw std::runtime_error{
         "Unable to open socket"
     };
 
-    GossipQueue gossipQueue;
+    ThreadSaveGossipQueue threadSaveQueue;
     // TODO(AndreevSemen) : Change listening queue length for env variable
-    std::thread threadInput{GossipsCatching, sd, 10, std::ref(gossipQueue)};
+    std::thread threadInput{GossipsCatching, sd, 10, std::ref(threadSaveQueue)};
 
     MemberTable table;
     while (true) {
-        UpdateTable(table, gossipQueue);
+        std::deque<Gossip> receivedGossips{threadSaveQueue.Free()};
+        UpdateTable(table, receivedGossips);
 
-        std::vector<Gossip> gossips = GenerateGossips(table);
-        for (const auto& gossip : gossips) {
+        auto newGossips = GenerateGossips(table, receivedGossips);
+
+        for (const auto& gossip : newGossips) {
             SendGossip(sd, gossip);
         }
     }

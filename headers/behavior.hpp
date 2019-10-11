@@ -11,25 +11,26 @@
 
 #include <stdexcept>
 #include <thread>
-#include <queue>
+#include <deque>
 #include <mutex>
 
 #include <types.hpp>
+#include <buffer.hpp>
 
-class GossipQueue {
+class ThreadSaveGossipQueue {
 private:
-    std::queue<Gossip> queue_;
+    std::deque<Gossip> queue_;
     std::mutex mutex_;
 
 public:
     void Push(const Gossip& gossip);
-    bool SafetyPop(Gossip& gossip);
+    std::deque<Gossip> Free();
 };
 
 int SetupSocket(in_port_t port);
-void GossipsCatching(int sd, size_t listenQueueLength, GossipQueue& queue);
-void UpdateTable(MemberTable& table, GossipQueue& queue);
-std::vector<Gossip> GenerateGossips(MemberTable& table);
+void GossipsCatching(int sd, size_t listenQueueLength, ThreadSaveGossipQueue& queue);
+void UpdateTable(MemberTable& table, const std::deque<Gossip>& queue);
+std::deque<Gossip> GenerateGossips(MemberTable& table, std::deque<Gossip>& queue); // TODO: complete it
 void SendGossip(int sd, const Gossip& gossip);
 
 

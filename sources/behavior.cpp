@@ -2,21 +2,18 @@
 
 #include <behavior.hpp>
 
-void GossipQueue::Push(const Gossip& gossip) {
+void ThreadSaveGossipQueue::Push(const Gossip& gossip) {
     std::lock_guard lock{mutex_};
-    queue_.push(gossip);
+    queue_.push_back(gossip);
 }
 
-bool GossipQueue::SafetyPop(Gossip& gossip) {
+std::deque<Gossip> ThreadSaveGossipQueue::Free() {
     std::lock_guard lock{mutex_};
 
-    if (queue_.empty())
-        return false;
+    std::deque<Gossip> bucket{queue_};
+    queue_.clear();
 
-    gossip = queue_.front();
-    queue_.pop();
-
-    return true;
+    return std::move(bucket);
 }
 
 int SetupSocket(in_port_t port) {
@@ -36,43 +33,61 @@ int SetupSocket(in_port_t port) {
     return sd;
 }
 
-void GossipsCatching(int sd, size_t listenQueueLength, GossipQueue& queue) {
-    size_t buffSize = 1500;
-    byte inBuff[1500]{};
+void GossipsCatching(int sd, size_t listenQueueLength, ThreadSaveGossipQueue& queue) {
+    // TODO(AndreevSemen): Change this for env var
+    ByteBuffer buffer{1500};
     while (true) {
         listen(sd, listenQueueLength);
 
-        sockaddr_in addr{};
-        size_t msgLength = recvfrom(sd, inBuff, buffSize, 0, (sockaddr*) &addr, nullptr);
+        size_t msgLength = recvfrom(sd, buffer.Begin(), buffer.Size(),
+                                     0, nullptr, nullptr);
 
         Gossip gossip{};
         // Skips gossip if data unreadable
-        if (!gossip.Read(inBuff, inBuff + buffSize)) continue;
-        --gossip.TTL;
+        if (!gossip.Read(buffer.Begin(), buffer.End())) continue;
 
         queue.Push(gossip);
     }
 }
 
-void UpdateTable(MemberTable& table, GossipQueue& queue) {
+void UpdateTable(MemberTable& table, const std::deque<Gossip>& queue) {
     Gossip gossip;
-    while (queue.SafetyPop(gossip)) {
-        table.Update(gossip);
+    while (!queue.empty()) {
+        table.Update(queue.front());
+    }
+}
+
+std::deque<Gossip> GenerateGossips(MemberTable& table, std::deque<Gossip>& queue) {
+    std::deque<Gossip> newGossips;
+
+    for (const auto& gossip : queue) {
+        if (queue.front().TTL == 0) {
+            queue.pop_front();
+            continue;
+        }
+
+        Gossip newGossip{};
+        newGossip.TTL = gossip.TTL - 1;
+        newGossip.Owner = {gossip.Dest.Addr, gossip.Dest.Info};
+        newGossip.Dest
+        newGossip.Events = gossip.Events;
+        // TODO : Change it for env var
+        newGossip.Table = table.GetSubset(4);
+
+        newGossips.push_back(newGossip);
     }
 }
 
 void SendGossip(int sd, const Gossip& gossip) {
-    size_t size = gossip.ByteSize();
+    std::vector<byte> buffer;
+    buffer.resize(gossip.ByteSize());
 
-    byte* buff = new byte[size];
-    gossip.InsertToBytes(buff, buff + size);
+    gossip.Write(buffer.data(), buffer.data() + buffer.size());
 
     sockaddr_in dest{};
     dest.sin_family = AF_INET;
     dest.sin_addr = gossip.Dest.Addr.IP;
     dest.sin_port = gossip.Dest.Addr.Port;
 
-    sendto(sd, buff, size, 0, (sockaddr*) &dest, sizeof(dest));
-
-    delete[] buff;
+    sendto(sd, buffer.data(), buffer.size(), 0, (sockaddr*) &dest, sizeof(dest));
 }

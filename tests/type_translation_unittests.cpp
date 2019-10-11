@@ -3,27 +3,191 @@
 #include <gtest/gtest.h>
 #include <arpa/inet.h>
 
+#include <random>
+
 #include <types.hpp>
+#include <buffer.hpp>
+
+
+void MemberTable::DebugInsert(const Member& member) {
+    table_.insert(std::make_pair(member.Addr, member.Info));
+}
+
+class MemberList {
+private:
+    std::vector<Member> list_;
+    mutable std::mt19937 generator_;
+
+public:
+    MemberList()
+      : generator_(std::random_device{}())
+    {
+        std::vector<std::string> strIPVec = {
+                "127.0.0.1",
+                "192.72.1.12",
+                "111.111.111.111",
+                "123.321.432.234",
+                "217.69.128.44",
+                "77.88.8.8",
+                "213.180.217.10",
+                "213.180.217.219",
+                "213.180.217.7",
+                "213.180.210.1",
+                "213.180.194.138",
+                "213.180.194.164",
+                "213.180.194.185",
+                "213.180.216.233",
+                "213.180.216.234",
+                "213.180.210.5",
+                "213.180.210.9",
+                "213.180.210.7",
+                "213.180.210.10",
+                "213.180.216.30",
+                "213.180.216.160",
+                "213.180.216.164",
+                "213.180.216.165",
+                "213.180.216.7"
+        };
+        std::vector<in_addr> uintIPVec;
+        std::vector<uint16_t> portVec;
+        std::vector<MemberAddr> addrVec;
+
+        std::vector<MemberInfo::State> statesVec;
+        std::vector<uint32_t> incarnationVec;
+        std::vector<TimeStamp> timeVec;
+        std::vector<MemberInfo> infoVec;
+
+        // initialize loop
+        for (size_t i = 0; i < strIPVec.size(); ++i) {
+            // uintIP
+            in_addr addr {};
+            inet_aton(strIPVec[i].c_str(), &addr);
+            uintIPVec.push_back(addr);
+            // port
+            portVec.push_back(80 + i);
+            // addr
+            addrVec.emplace_back(MemberAddr{uintIPVec[i],
+                                             portVec[i]});
+
+            // state
+            statesVec.push_back(MemberInfo::State(generator_()%4));
+            // incarnation
+            incarnationVec.push_back(static_cast<uint32_t>(generator_()));
+            // timestamp
+            timeVec.push_back(TimeStamp {static_cast<uint32_t>(generator_())});
+            // info
+            infoVec.emplace_back(MemberInfo{statesVec[i],
+                                            incarnationVec[i],
+                                            timeVec[i]});
+
+            // member
+            list_.emplace_back(addrVec[i], infoVec[i]);
+        }
+    }
+
+    const Member& RandomMember() const {
+        return list_[generator_() % list_.size()];
+    }
+
+    const std::vector<Member>& GetList() const {
+        return list_;
+    }
+} list;
 
 TEST(TypeTranslation, Member) {
-    Member member;
+    // Normal buffer test
+    for (const auto& member : list.GetList()) {
+        std::vector<byte> buffer;
+        buffer.resize(member.ByteSize());
 
-    inet_aton("127.0.0.1", &member.Addr.IP);
-    member.Addr.Port = 80;
-    member.Info.Status = MemberInfo::Dead;
-    member.Info.Incarnation = -1;
-    member.Info.LastUpdate.Time = std::clock();
+        auto writePtr = member.Write(buffer.data(), buffer.data() + buffer.size());
+        EXPECT_NE(writePtr, nullptr);
+        EXPECT_EQ(writePtr, buffer.data() + buffer.size());
 
-    byte buffer[100];
+        Member result {};
+        auto readPtr = result.Read(buffer.data(), buffer.data() + buffer.size());
+        EXPECT_NE(readPtr, nullptr);
+        EXPECT_EQ(readPtr, buffer.data() + buffer.size());
 
-    auto ptrResult = member.InsertToBytes(buffer, buffer + 18);
-    EXPECT_NE(ptrResult, nullptr);
+        EXPECT_EQ(result, member);
+    }
 
-    Member translated{*reinterpret_cast<Member*>(buffer)};
+    // Short buffer test
+    Member member{list.RandomMember()};
 
-    EXPECT_EQ(translated, member);
+    std::vector<byte> shortBuff;
+    shortBuff.resize(member.ByteSize() - 1);
+
+    auto writePtr = member.Write(shortBuff.data(), shortBuff.data() + shortBuff.size());
+    EXPECT_EQ(writePtr, nullptr);
+
+    auto readPtr = member.Read(shortBuff.data(), shortBuff.data() + shortBuff.size());
+    EXPECT_EQ(readPtr, nullptr);
 }
 
 TEST(TypeTranslation, MemberTable) {
+    // Normal buffer test
+    MemberTable table;
+    for (const auto& member : list.GetList())
+        table.DebugInsert(member);
 
+    ByteBuffer buffer(table.ByteSize());
+
+    auto writePtr = table.Write(buffer.Begin(), buffer.End());
+    EXPECT_NE(writePtr, nullptr);
+    EXPECT_EQ(writePtr, buffer.End());
+
+    MemberTable result;
+    auto readPtr = result.Read(buffer.Begin(), buffer.End());
+
+    EXPECT_NE(readPtr, nullptr);
+    EXPECT_EQ(readPtr, buffer.End());
+
+    EXPECT_EQ(result, table);
+
+    // Short buffer test
+    ByteBuffer shortBuff{table.ByteSize() - 1};
+
+    writePtr = table.Write(shortBuff.Begin(), shortBuff.End());
+    EXPECT_EQ(writePtr, nullptr);
+
+    readPtr = table.Read(shortBuff.Begin(), shortBuff.End());
+    EXPECT_EQ(readPtr, nullptr);
 }
+
+TEST(TypeTranslation, Gossip) {
+    // Normal buffer test
+    Gossip gossip;
+    gossip.TTL = 42;
+    gossip.Owner = list.RandomMember();
+    gossip.Dest = list.RandomMember();
+    gossip.Events = list.GetList();
+
+    for (const auto& member : list.GetList())
+        gossip.Table.DebugInsert(member);
+
+    ByteBuffer buffer{gossip.ByteSize()};
+
+    auto writePtr = gossip.Write(buffer.Begin(), buffer.End());
+    EXPECT_NE(writePtr, nullptr);
+    EXPECT_EQ(writePtr, buffer.End());
+
+    Gossip result;
+    auto readPtr = result.Read(buffer.Begin(), buffer.End());
+
+    EXPECT_NE(writePtr, nullptr);
+    EXPECT_EQ(writePtr, buffer.End());
+
+    EXPECT_EQ(result, gossip);
+
+    // Short buffer test
+    ByteBuffer shortBuff{gossip.ByteSize() - 1};
+
+    writePtr = gossip.Write(shortBuff.Begin(), shortBuff.End());
+    EXPECT_EQ(writePtr, nullptr);
+
+    readPtr = gossip.Read(shortBuff.Begin(), shortBuff.End());
+    EXPECT_EQ(readPtr, nullptr);
+}
+
+
