@@ -33,5 +33,6 @@ void UpdateTable(MemberTable& table, const std::deque<Gossip>& queue);
 std::deque<Gossip> GenerateGossips(MemberTable& table, std::deque<Gossip>& queue); // TODO: complete it
 void SendGossip(int sd, const Gossip& gossip);
 
+void AppConnector(const MemberTable& table);
 
 #endif // HEADERS_BEHAVIOR_HPP_

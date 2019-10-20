@@ -5,6 +5,5 @@
 #include <types.hpp>
 
 TEST(MemberTable, ) {
-    std::cout << std::endl;
 
 }

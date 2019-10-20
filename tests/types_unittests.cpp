@@ -10,7 +10,11 @@
 
 
 void MemberTable::DebugInsert(const Member& member) {
-    table_.insert(std::make_pair(member.Addr, member.Info));
+    Insert(member);
+}
+
+bool MemberTable::DebugIsExists(const Member& member) const {
+    return index_.find(member.Addr) != index_.end();
 }
 
 class MemberList {
@@ -188,6 +192,37 @@ TEST(TypeTranslation, Gossip) {
 
     readPtr = gossip.Read(shortBuff.Begin(), shortBuff.End());
     EXPECT_EQ(readPtr, nullptr);
+}
+
+TEST(MemberTable, RandomMethods) {
+    MemberTable table;
+    for (const auto& member : list.GetList()) {
+        table.DebugInsert(member);
+    }
+
+    // Get random member method
+    for (size_t i = 0; i < 1000; ++i) {
+        auto member = table.RandomMember();
+        EXPECT_TRUE(table.DebugIsExists(member));
+    }
+
+    // Get subset method
+    auto subset = table.GetSubset(list.GetList().size()/2);
+
+    std::vector<Member> membersInSubset;
+    for (const auto& member : list.GetList()) {
+        if (subset.DebugIsExists(member)) {
+            membersInSubset.push_back(member);
+        }
+    }
+    EXPECT_EQ(membersInSubset.size(), list.GetList().size()/2);
+
+    for (size_t i = 0; i < membersInSubset.size(); ++i) {
+        for (size_t j = 0; j < membersInSubset.size(); ++j) {
+            if (i == j) continue;
+            EXPECT_FALSE(membersInSubset[i] == membersInSubset[j]);
+        }
+    }
 }
 
 

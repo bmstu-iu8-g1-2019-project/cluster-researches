@@ -26,3 +26,7 @@ const byte* ByteBuffer::End() const {
 byte* ByteBuffer::End() {
     return const_cast<byte*>(const_cast<const ByteBuffer*>(this)->End());
 }
+
+std::size_t ByteBuffer::Size() const {
+    return size_;
+}

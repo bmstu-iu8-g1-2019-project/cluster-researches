@@ -6,9 +6,14 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <algorithm>
+#include <random>
+
+#include <nlohmann/json.hpp>
 
 #include <unistd.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 
 
 /* Member  ------------------------> 6 + 12 = 18 B
@@ -133,10 +138,14 @@ public:
 
 class MemberTable : public ByteTranslatable {
 private:
-    std::unordered_map<MemberAddr, MemberInfo, MemberAddr::Hasher> table_;
+    std::unordered_map<MemberAddr, size_t, MemberAddr::Hasher> index_;
+    std::vector<Member> set_;
+    mutable std::mt19937 rGenerator_;
 
 public:
-    MemberTable() = default;
+    MemberTable();
+
+    nlohmann::json ToJSON() const;
 
     byte* Write(byte* bBegin, byte* bEnd) const override;
     const byte* Read(const byte *bBegin, const byte *bEnd) override;
@@ -146,11 +155,17 @@ public:
 
     void Update(const Gossip& gossip);
 
+    Member RandomMember() const;
     MemberTable GetSubset(size_t size) const;
 
     bool operator==(const MemberTable& rhs) const;
 
     void DebugInsert(const Member& member);
+    bool DebugIsExists(const Member& member) const;
+
+private:
+    void Insert(const Member& member);
+    void UpdateRecordIfNewer(const Member& member);
 };
 
 

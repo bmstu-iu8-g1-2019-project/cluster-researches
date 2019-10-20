@@ -18,6 +18,9 @@ int main() {
     std::thread threadInput{GossipsCatching, sd, 10, std::ref(threadSaveQueue)};
 
     MemberTable table;
+
+    std::thread appConnector{AppConnector, std::ref(table)};
+
     while (true) {
         std::deque<Gossip> receivedGossips{threadSaveQueue.Free()};
         UpdateTable(table, receivedGossips);

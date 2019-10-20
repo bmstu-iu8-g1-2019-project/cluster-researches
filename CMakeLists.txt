@@ -30,6 +30,7 @@ add_library(types STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/sources/types.cpp)
 target_include_directories(types
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers)
+target_link_libraries(types nlohmann_json::nlohmann_json)
 
 add_library(buffer STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/sources/buffer.cpp)
@@ -45,7 +46,7 @@ target_link_libraries(behavior
 
 
 add_executable(type_translation_unittests
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/type_translation_unittests.cpp)
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/types_unittests.cpp)
 target_include_directories(type_translation_unittests
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers)
 target_link_libraries(type_translation_unittests

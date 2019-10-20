@@ -39,11 +39,10 @@ void GossipsCatching(int sd, size_t listenQueueLength, ThreadSaveGossipQueue& qu
     while (true) {
         listen(sd, listenQueueLength);
 
-        size_t msgLength = recvfrom(sd, buffer.Begin(), buffer.Size(),
-                                     0, nullptr, nullptr);
+        recvfrom(sd, buffer.Begin(), buffer.Size(),0, nullptr, nullptr);
 
         Gossip gossip{};
-        // Skips gossip if data unreadable
+        // Skips gossip if data unreadable (Read() returns `nullptr`)
         if (!gossip.Read(buffer.Begin(), buffer.End())) continue;
 
         queue.Push(gossip);
@@ -51,9 +50,8 @@ void GossipsCatching(int sd, size_t listenQueueLength, ThreadSaveGossipQueue& qu
 }
 
 void UpdateTable(MemberTable& table, const std::deque<Gossip>& queue) {
-    Gossip gossip;
-    while (!queue.empty()) {
-        table.Update(queue.front());
+    for (const auto& gossip : queue) {
+        table.Update(gossip);
     }
 }
 
@@ -68,14 +66,18 @@ std::deque<Gossip> GenerateGossips(MemberTable& table, std::deque<Gossip>& queue
 
         Gossip newGossip{};
         newGossip.TTL = gossip.TTL - 1;
-        newGossip.Owner = {gossip.Dest.Addr, gossip.Dest.Info};
-        newGossip.Dest
+        newGossip.Owner = gossip.Dest;
+        newGossip.Dest = table.RandomMember();
         newGossip.Events = gossip.Events;
         // TODO : Change it for env var
         newGossip.Table = table.GetSubset(4);
 
         newGossips.push_back(newGossip);
+
+        queue.pop_front();
     }
+
+    return newGossips;
 }
 
 void SendGossip(int sd, const Gossip& gossip) {
@@ -90,4 +92,26 @@ void SendGossip(int sd, const Gossip& gossip) {
     dest.sin_port = gossip.Dest.Addr.Port;
 
     sendto(sd, buffer.data(), buffer.size(), 0, (sockaddr*) &dest, sizeof(dest));
+}
+
+void AppConnector(const MemberTable& table) {
+    int sd = socket(AF_UNIX, SOCK_STREAM, 0);
+
+    sockaddr_un path{};
+    path.sun_family = AF_UNIX;
+    // TODO : Change it for env var
+    std::string str{"./socket.sock"};
+    std::copy(str.cbegin(), str.cend(), path.sun_path);
+
+    if (bind(sd, (sockaddr*) &path, sizeof(path)) == -1) {
+        throw std::runtime_error{
+            "Unable to open UNIX-socket"
+        };
+    }
+
+    std::string json = table.ToJSON().dump();
+    while (true) {
+        std::this_thread::__sleep_for(std::chrono::seconds{5}, std::chrono::nanoseconds{0});
+        send(sd, json.c_str(), json.size(), 0);
+    }
 }
