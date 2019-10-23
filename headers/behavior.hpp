@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <thread>
 #include <deque>
+#include <iostream>
 #include <mutex>
 
 #include <types.hpp>
@@ -29,7 +30,7 @@ public:
 
 int SetupSocket(in_port_t port);
 void GossipsCatching(int sd, size_t listenQueueLength, ThreadSaveGossipQueue& queue);
-void UpdateTable(MemberTable& table, const std::deque<Gossip>& queue);
+std::deque<Conflict> UpdateTable(MemberTable& table, const std::deque<Gossip>& queue);
 std::deque<Gossip> GenerateGossips(MemberTable& table, std::deque<Gossip>& queue); // TODO: complete it
 void SendGossip(int sd, const Gossip& gossip);
 

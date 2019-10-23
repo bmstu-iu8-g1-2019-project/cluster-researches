@@ -1,6 +1,7 @@
 // Copyright 2019 AndreevSemen semen.andreev00@mail.ru
 
 #include <types.hpp>
+#include <deque>
 
 MemberAddr::MemberAddr(in_addr addr, in_port_t port)
   : IP{addr}
@@ -96,6 +97,33 @@ Member::Member(const MemberAddr& addr, const MemberInfo& info)
   , Info{info}
 {}
 
+nlohmann::json Member::ToJSON() const {
+    auto json = nlohmann::json::object();
+
+    json["addr"]["IP"] = inet_ntoa(Addr.IP);
+    json["addr"]["port"] = Addr.Port;
+
+    std::string status;
+    switch (Info.Status) {
+        case MemberInfo::State::Alive:
+            status = "alive";
+            break;
+        case MemberInfo::State::Suspicious:
+            status = "suspicious";
+            break;
+        case MemberInfo::State::Dead:
+            status = "dead";
+            break;
+        case MemberInfo::State::Left:
+            status = "left";
+            break;
+    }
+    json["info"]["status"] = status;
+    json["info"]["incarnation"] = Info.Incarnation;
+
+    return std::move(json);
+}
+
 bool Member::operator==(const Member &rhs) const {
     return Addr == rhs.Addr && Info == rhs.Info;
 }
@@ -127,30 +155,7 @@ nlohmann::json MemberTable::ToJSON() const {
     nlohmann::json array = nlohmann::json::array();
 
     for (const auto& member : set_) {
-        nlohmann::json memberJson;
-
-        memberJson["addr"]["IP"] = inet_ntoa(member.Addr.IP);
-        memberJson["addr"]["port"] = member.Addr.Port;
-
-        std::string status;
-        switch (member.Info.Status) {
-            case MemberInfo::State::Alive:
-                status = "alive";
-                break;
-            case MemberInfo::State::Suspicious:
-                status = "suspicious";
-                break;
-            case MemberInfo::State::Dead:
-                status = "dead";
-                break;
-            case MemberInfo::State::Left:
-                status = "left";
-                break;
-        }
-        memberJson["info"]["status"] = status;
-        memberJson["info"]["incarnation"] = member.Info.Incarnation;
-
-        array.push_back(memberJson);
+        array.push_back(member.ToJSON());
     }
 
     return std::move(array);
@@ -192,7 +197,7 @@ size_t MemberTable::ByteSize() const {
 // TODO(AndreevSemen): here will be gossip-update logic
 // TODO              : for example, here might be solved timestamps diffs
 // TODO              : or statuses' conflicts
-void MemberTable::Update(const Gossip& gossip) {
+void MemberTable::Update(const Gossip& gossip, std::deque<Conflict>& conflicts) {
     auto found = index_.find(gossip.Owner.Addr);
     if (found == index_.end()) {
         Insert(gossip.Owner);
@@ -206,7 +211,21 @@ void MemberTable::Update(const Gossip& gossip) {
 
     // Unreliable logic
     for (const auto& member : gossip.Table.set_) {
-        UpdateRecordIfNewer(member);
+        auto found = index_.find(member.Addr);
+        if (found == index_.end()) {
+            UpdateRecordIfNewer(member);
+            continue;
+        }
+
+        if (member == set_[found->second])
+            continue;
+
+        if (member.Info.Incarnation > set_[found->second].Info.Incarnation) {
+            UpdateRecordIfNewer(member);
+            continue;
+        }
+
+        conflicts.emplace_back(Conflict{gossip.Owner.Addr, member.Addr});
     }
 }
 

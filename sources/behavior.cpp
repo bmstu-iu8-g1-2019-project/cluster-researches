@@ -27,7 +27,9 @@ int SetupSocket(in_port_t port) {
     addr.sin_port = htons(port);
 
     if (bind(sd, (sockaddr*) &addr, sizeof(addr)) == -1) {
-        return -1;
+        throw std::runtime_error{
+            "Couldn't bind inet socket"
+        };
     }
 
     return sd;
@@ -46,13 +48,19 @@ void GossipsCatching(int sd, size_t listenQueueLength, ThreadSaveGossipQueue& qu
         if (!gossip.Read(buffer.Begin(), buffer.End())) continue;
 
         queue.Push(gossip);
+
+        std::cout << gossip.Owner.ToJSON() << std::endl;
     }
 }
 
-void UpdateTable(MemberTable& table, const std::deque<Gossip>& queue) {
-    for (const auto& gossip : queue) {
-        table.Update(gossip);
+std::deque<Conflict> UpdateTable(MemberTable& table, const std::deque<Gossip>& gossipQueue) {
+    std::deque<Conflict> conflicts;
+
+    for (const auto& gossip : gossipQueue) {
+        table.Update(gossip, conflicts);
     }
+
+    return conflicts;
 }
 
 std::deque<Gossip> GenerateGossips(MemberTable& table, std::deque<Gossip>& queue) {
@@ -88,10 +96,13 @@ void SendGossip(int sd, const Gossip& gossip) {
 
     sockaddr_in dest{};
     dest.sin_family = AF_INET;
-    dest.sin_addr = gossip.Dest.Addr.IP;
-    dest.sin_port = gossip.Dest.Addr.Port;
+    dest.sin_addr.s_addr = htonl(gossip.Dest.Addr.IP.s_addr);
+    dest.sin_port = htons(gossip.Dest.Addr.Port);
 
-    sendto(sd, buffer.data(), buffer.size(), 0, (sockaddr*) &dest, sizeof(dest));
+    if (sendto(sd, buffer.data(), buffer.size(), 0, (sockaddr*) &dest, sizeof(dest)) == -1)
+        throw std::runtime_error{
+            "Couldn't send gossip"
+        };
 }
 
 void AppConnector(const MemberTable& table) {

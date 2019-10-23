@@ -8,6 +8,7 @@
 #include <vector>
 #include <algorithm>
 #include <random>
+#include <deque>
 
 #include <nlohmann/json.hpp>
 
@@ -49,6 +50,10 @@ struct ByteTranslatable {
     virtual byte* Write(byte* bBegin, byte* bEnd) const = 0;
     virtual const byte* Read(const byte* bBegin, const byte* bEnd) = 0;
     virtual size_t ByteSize() const = 0;
+};
+
+struct JSONTranslatable {
+    virtual nlohmann::json ToJSON() const = 0;
 };
 
 template < typename Type >
@@ -119,7 +124,7 @@ struct MemberInfo : public ByteTranslatable {
 
 
 // Here keeps all information about node
-struct Member : public ByteTranslatable {
+struct Member : public ByteTranslatable, public JSONTranslatable {
 public:
     MemberAddr Addr;
     MemberInfo Info;
@@ -127,6 +132,8 @@ public:
 public:
     Member();
     Member(const MemberAddr& addr, const MemberInfo& info);
+
+    nlohmann::json ToJSON() const override;
 
     byte* Write(byte* bBegin, byte* bEnd) const override;
     const byte* Read(const byte *bBegin, const byte *bEnd) override;
@@ -136,7 +143,13 @@ public:
 };
 
 
-class MemberTable : public ByteTranslatable {
+struct Conflict {
+    MemberAddr Initiator;
+    MemberAddr Target;
+};
+
+
+class MemberTable : public ByteTranslatable , public JSONTranslatable {
 private:
     std::unordered_map<MemberAddr, size_t, MemberAddr::Hasher> index_;
     std::vector<Member> set_;
@@ -145,7 +158,7 @@ private:
 public:
     MemberTable();
 
-    nlohmann::json ToJSON() const;
+    nlohmann::json ToJSON() const override;
 
     byte* Write(byte* bBegin, byte* bEnd) const override;
     const byte* Read(const byte *bBegin, const byte *bEnd) override;
@@ -153,7 +166,7 @@ public:
 
     size_t Size() const;
 
-    void Update(const Gossip& gossip);
+    void Update(const Gossip& gossip, std::deque<Conflict>& conflicts);
 
     Member RandomMember() const;
     MemberTable GetSubset(size_t size) const;
