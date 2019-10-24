@@ -15,6 +15,8 @@
 #include <iostream>
 #include <mutex>
 
+#include <boost/asio.hpp>
+
 #include <types.hpp>
 #include <buffer.hpp>
 
