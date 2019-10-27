@@ -38,6 +38,7 @@ target_include_directories(types
 )
 target_link_libraries(types
         PUBLIC nlohmann_json::nlohmann_json
+        PUBLIC Boost::system
 )
 
 

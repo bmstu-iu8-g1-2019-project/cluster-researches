@@ -16,36 +16,30 @@ std::deque<Gossip> ThreadSaveGossipQueue::Free() {
     return std::move(bucket);
 }
 
-int SetupSocket(in_port_t port) {
-    int sd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sd == -1)
-        return -1;
+boost::asio::ip::udp::socket SetupSocket(boost::asio::io_service& ioService, uint16_t port) {
+    using namespace boost::asio;
+    ip::udp::socket sock(ioService, ip::udp::endpoint{ip::address_v4::any(), port});
 
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(port);
+    sock.set_option(boost::asio::ip::udp::socket::reuse_address{});
 
-    if (bind(sd, (sockaddr*) &addr, sizeof(addr)) == -1) {
-        throw std::runtime_error{
-            "Couldn't bind inet socket"
-        };
-    }
-
-    return sd;
+    return std::move(sock);
 }
 
-void GossipsCatching(int sd, size_t listenQueueLength, ThreadSaveGossipQueue& queue) {
+void GossipsCatching(boost::asio::ip::udp::socket& sock, ThreadSaveGossipQueue& queue) {
     // TODO(AndreevSemen): Change this for env var
     ByteBuffer buffer{1500};
     while (true) {
-        listen(sd, listenQueueLength);
+        std::cout << "Gossip catching began" << std::endl;
 
-        recvfrom(sd, buffer.Begin(), buffer.Size(),0, nullptr, nullptr);
+        boost::asio::ip::udp::endpoint senderEp{};
+        std::cout << "Boost sock received : " << sock.receive_from(boost::asio::buffer(buffer.Begin(), buffer.Size()), senderEp) << std::endl;
 
         Gossip gossip{};
         // Skips gossip if data unreadable (Read() returns `nullptr`)
-        if (!gossip.Read(buffer.Begin(), buffer.End())) continue;
+        if (!gossip.Read(buffer.Begin(), buffer.End())) {
+            std::cout << "Gossip is invalid:" << std::endl;
+            continue;
+        }
 
         queue.Push(gossip);
 
@@ -88,21 +82,12 @@ std::deque<Gossip> GenerateGossips(MemberTable& table, std::deque<Gossip>& queue
     return newGossips;
 }
 
-void SendGossip(int sd, const Gossip& gossip) {
-    std::vector<byte> buffer;
-    buffer.resize(gossip.ByteSize());
+void SendGossip(boost::asio::ip::udp::socket& sock, const Gossip& gossip) {
+    ByteBuffer buffer{gossip.ByteSize()};
+    gossip.Write(buffer.Begin(), buffer.End());
 
-    gossip.Write(buffer.data(), buffer.data() + buffer.size());
-
-    sockaddr_in dest{};
-    dest.sin_family = AF_INET;
-    dest.sin_addr.s_addr = htonl(gossip.Dest.Addr.IP.s_addr);
-    dest.sin_port = htons(gossip.Dest.Addr.Port);
-
-    if (sendto(sd, buffer.data(), buffer.size(), 0, (sockaddr*) &dest, sizeof(dest)) == -1)
-        throw std::runtime_error{
-            "Couldn't send gossip"
-        };
+    boost::asio::ip::udp::endpoint destEp{gossip.Owner.Addr.IP, gossip.Owner.Addr.Port};
+    sock.send_to(boost::asio::buffer(buffer.Begin(), buffer.Size()), destEp);
 }
 
 void AppConnector(const MemberTable& table) {

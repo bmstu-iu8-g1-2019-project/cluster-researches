@@ -6,23 +6,19 @@
 
 
 int main() {
-    // TODO(AndreevSemen) : Change port for env variable
-    int sd = SetupSocket(82);
-    if (sd == -1)
-        throw std::runtime_error{
-            "Unable to open inet socket"
-        };
+    boost::asio::io_service ioService;
+    auto sock = SetupSocket(ioService, 8005);
 
     ThreadSaveGossipQueue threadSaveQueue;
     
     // TODO(AndreevSemen) : Change listening queue length for env variable
-    std::thread threadInput{GossipsCatching, sd, 10, std::ref(threadSaveQueue)};
+    std::thread threadInput{GossipsCatching, std::ref(sock), std::ref(threadSaveQueue)};
     threadInput.detach();
 
     MemberTable table;
 
-    std::thread appConnector{AppConnector, std::ref(table)};
-    appConnector.detach();
+    //std::thread appConnector{AppConnector, std::ref(table)};
+    //appConnector.detach();
 
     while (true) {
         std::deque<Gossip> receivedGossips = threadSaveQueue.Free();
@@ -31,7 +27,7 @@ int main() {
         auto newGossips = GenerateGossips(table, receivedGossips);
 
         for (const auto &gossip : newGossips) {
-            SendGossip(sd, gossip);
+            SendGossip(sock, gossip);
         }
     }
 }
