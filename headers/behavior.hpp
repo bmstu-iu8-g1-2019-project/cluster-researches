@@ -3,21 +3,33 @@
 #ifndef HEADERS_BEHAVIOR_HPP_
 #define HEADERS_BEHAVIOR_HPP_
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <netinet/in.h>
-#include <unistd.h>
-
 #include <stdexcept>
 #include <thread>
+#include <deque>
+#include <iostream>
+#include <mutex>
+
+#include <boost/asio.hpp>
 
 #include <types.hpp>
-#include <membertable.hpp>
-#include <gossiping.hpp>
+#include <buffer.hpp>
 
-void AppCommunicator(int sd, MemberTable& table);
+class ThreadSaveGossipQueue {
+private:
+    std::deque<Gossip> queue_;
+    std::mutex mutex_;
 
-void Gossiping(int sd, MemberTable& table);
+public:
+    void Push(const Gossip& gossip);
+    std::deque<Gossip> Free();
+};
+
+boost::asio::ip::udp::socket SetupSocket(boost::asio::io_service& ioService, uint16_t port);
+void GossipsCatching(boost::asio::ip::udp::socket& sock, ThreadSaveGossipQueue& queue);
+std::deque<Conflict> UpdateTable(MemberTable& table, const std::deque<Gossip>& queue);
+std::deque<Gossip> GenerateGossips(MemberTable& table, std::deque<Gossip>& queue); // TODO: complete it
+void SendGossip(boost::asio::ip::udp::socket&, const Gossip& gossip);
+
+void AppConnector(const MemberTable& table);
 
 #endif // HEADERS_BEHAVIOR_HPP_

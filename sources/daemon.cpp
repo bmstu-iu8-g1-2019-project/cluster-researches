@@ -2,81 +2,33 @@
 
 #include <thread>
 
-#include <membertable.hpp>
 #include <behavior.hpp>
 
-int SetupUnixSocket(const std::string& path);
-int SetupUDPSocket(in_port_t port);
 
 int main() {
-    // Setting up external links
-    int app_sd = SetupUnixSocket(socket_file);
-    int gossip_sd;
-    try {
-        gossip_sd = SetupUDPSocket(gossip_port);
-    } catch (...) {
-        close(app_sd);
-        throw;
-    }
+    boost::asio::io_service ioService;
+    auto sock = SetupSocket(ioService, 8005);
+
+    ThreadSaveGossipQueue threadSaveQueue;
+    
+    // TODO(AndreevSemen) : Change listening queue length for env variable
+    std::thread threadInput{GossipsCatching, std::ref(sock), std::ref(threadSaveQueue)};
+    threadInput.detach();
 
     MemberTable table;
-    std::thread appLinkingThread{AppCommunicator, app_sd, std::ref(table)};
-    std::thread gossipingThread{Gossiping, gossip_sd, std::ref(table)};
 
-    try {
-        appLinkingThread.join();
-        gossipingThread.join();
-    } catch (...) {
-        close(app_sd);
-        close(gossip_sd);
-        throw;
+    //std::thread appConnector{AppConnector, std::ref(table)};
+    //appConnector.detach();
+
+    while (true) {
+        std::deque<Gossip> receivedGossips = threadSaveQueue.Free();
+        auto conflicts = UpdateTable(table, receivedGossips);
+
+        auto newGossips = GenerateGossips(table, receivedGossips);
+
+        for (const auto &gossip : newGossips) {
+            SendGossip(sock, gossip);
+        }
     }
-    close(app_sd);
-    close(gossip_sd);
-
-    return 0;
 }
 
-int SetupUnixSocket(const std::string& path) {
-    int sd = socket(AF_UNIX, SOCK_DGRAM, 0);
-    if (sd == -1)
-        throw std::runtime_error {
-                "Could not open application socket"
-        };
-
-    sockaddr_un addr{};
-    addr.sun_family = AF_UNIX;
-    unlink(path.c_str());
-    std::copy(path.cbegin(), path.cend(), &addr.sun_path);
-
-    if (bind(sd, (sockaddr*) &addr, sizeof(addr)) == -1) {
-        close(sd);
-        throw std::runtime_error {
-                "Could not bind application socket"
-        };
-    }
-
-    return sd;
-}
-
-int SetupUDPSocket(in_port_t port) {
-    int sd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sd == -1)
-        throw std::runtime_error{
-                "Socket opening error"
-        };
-
-    struct sockaddr_in host_addr = {};
-    host_addr.sin_family = AF_INET;
-    host_addr.sin_addr.s_addr = INADDR_ANY;
-    host_addr.sin_port = port;
-
-    if (bind(sd, (const sockaddr*) &host_addr, sizeof(host_addr)) == -1) {
-        close(sd);
-        throw std::runtime_error{
-                "Gossip socket bind error"
-        };
-    }
-
-    return sd;
-}
