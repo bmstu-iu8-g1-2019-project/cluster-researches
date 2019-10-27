@@ -16,7 +16,6 @@ public:
                 "127.0.0.1",
                 "192.72.1.12",
                 "111.111.111.111",
-                "123.321.432.234",
                 "217.69.128.44",
                 "77.88.8.8",
                 "213.180.217.10",
@@ -38,7 +37,7 @@ public:
                 "213.180.216.165",
                 "213.180.216.7"
         };
-        std::vector<in_addr> uintIPVec;
+        std::vector<boost::asio::ip::address> uintIPVec;
         std::vector<uint16_t> portVec;
         std::vector<MemberAddr> addrVec;
 
@@ -49,10 +48,8 @@ public:
 
         // initialize loop
         for (size_t i = 0; i < strIPVec.size(); ++i) {
-            // uintIP
-            in_addr addr {};
-            inet_aton(strIPVec[i].c_str(), &addr);
-            uintIPVec.push_back(addr);
+            // IP
+            uintIPVec.emplace_back(boost::asio::ip::address::from_string(strIPVec[i]));
             // port
             portVec.push_back(80 + i);
             // addr
@@ -88,39 +85,37 @@ int main() {
     Gossip gossip;
     gossip.Owner = list.RandomMember();
 
-    gossip.Owner.Addr.IP = in_addr{inet_addr("127.0.0.1")};
-    gossip.Owner.Addr.Port = in_port_t{85};
+    gossip.Owner.Addr.IP = boost::asio::ip::address_v4::loopback();
+    gossip.Owner.Addr.Port = 83;
 
     gossip.Dest = list.RandomMember();
     gossip.Dest.Addr.IP = gossip.Owner.Addr.IP;
-    gossip.Dest.Addr.Port = in_port_t{83};
+    gossip.Dest.Addr.Port = 80;
 
     gossip.Events = {};
     gossip.TTL = 10;
 
-    int sd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sd == -1) {
-        close(sd);
-        throw std::runtime_error{
-                "Couldn't open inet socket"
-        };
+    boost::asio::io_service ioService;
+    boost::asio::ip::udp::socket sock(ioService, boost::asio::ip::udp::endpoint(boost::asio::ip::udp::v4(), 8000));
+
+    ByteBuffer bBuffer{gossip.ByteSize()};
+    gossip.Write(bBuffer.Begin(), bBuffer.End());
+
+    std::cout << "Gossip content is:" << std::endl;
+
+    std::cout << "Gossip real byte size : " << gossip.ByteSize() << std::endl;
+    auto ptr = (bBuffer.Begin());
+    for (size_t i = 0; i < bBuffer.Size(); ++i) {
+        std::cout << (int) *ptr << " ";
+        ++ptr;
+        ++i;
     }
+    std::cout << std::endl;
 
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(gossip.Owner.Addr.Port);
+    boost::asio::ip::udp::endpoint ep(boost::asio::ip::address::from_string("127.0.0.1"), 8005);
+    sock.send_to(boost::asio::buffer(bBuffer.Begin(), bBuffer.Size()), ep);
 
-    if (bind(sd, (sockaddr*) &addr, sizeof(addr)) == -1) {
-        close(sd);
-        throw std::runtime_error{
-            "Couldn't bind inet socket"
-        };
-    }
-
-    SendGossip(sd, gossip);
-
-    close(sd);
+    SendGossip(sock, gossip);
 
     return 0;
 }

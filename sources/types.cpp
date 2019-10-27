@@ -3,45 +3,44 @@
 #include <types.hpp>
 #include <deque>
 
-MemberAddr::MemberAddr(in_addr addr, in_port_t port)
-  : IP{addr}
+MemberAddr::MemberAddr(boost::asio::ip::address addr, uint16_t port)
+  : IP{std::move(addr)}
   , Port{port}
 {}
 
 size_t MemberAddr::Hasher::operator()(const MemberAddr& key) const {
-    return std::hash<uint32_t>{}(key.IP.s_addr) ^
+    return std::hash<uint32_t>{}(key.IP.to_v4().to_uint()) ^
            (std::hash<uint16_t>{}(key.Port) << 1);
 }
 
 byte* MemberAddr::Write(byte *bBegin, byte *bEnd) const {
-    if (bEnd - bBegin <
-        sizeof(MemberAddr::IP) + sizeof(MemberAddr::Port))
+    if (bEnd - bBegin < ByteSize())
         return nullptr;
 
-    *reinterpret_cast<in_addr*>(bBegin) = IP;
-    bBegin += sizeof(in_addr);
+    *reinterpret_cast<uint32_t*>(bBegin) = IP.to_v4().to_uint();
+    bBegin += sizeof(uint32_t);
 
-    *reinterpret_cast<in_port_t*>(bBegin) = Port;
-    return bBegin + sizeof(in_port_t);
+    *reinterpret_cast<uint16_t*>(bBegin) = Port;
+    return bBegin + sizeof(uint16_t);
 }
 
 const byte* MemberAddr::Read(const byte *bBegin, const byte *bEnd) {
     if (bEnd - bBegin < ByteSize())
         return nullptr;
 
-    IP = *reinterpret_cast<const in_addr*>(bBegin);
-    bBegin += sizeof(in_addr);
+    IP = boost::asio::ip::address_v4{*reinterpret_cast<const uint32_t*>(bBegin)};
+    bBegin += sizeof(uint32_t);
 
-    Port = *reinterpret_cast<const in_port_t*>(bBegin);
-    return bBegin + sizeof(in_port_t);
+    Port = *reinterpret_cast<const uint16_t*>(bBegin);
+    return bBegin + sizeof(uint16_t);
 }
 
 size_t MemberAddr::ByteSize() const {
-    return sizeof(MemberAddr::IP) + sizeof(MemberAddr::Port);
+    return sizeof(uint32_t) + sizeof(uint16_t);
 }
 
 bool MemberAddr::operator==(const MemberAddr &rhs) const {
-    return IP.s_addr == rhs.IP.s_addr && Port == rhs.Port;
+    return IP == rhs.IP && Port == rhs.Port;
 }
 
 
@@ -100,7 +99,7 @@ Member::Member(const MemberAddr& addr, const MemberInfo& info)
 nlohmann::json Member::ToJSON() const {
     auto json = nlohmann::json::object();
 
-    json["addr"]["IP"] = inet_ntoa(Addr.IP);
+    json["addr"]["IP"] = Addr.IP.to_string();
     json["addr"]["port"] = Addr.Port;
 
     std::string status;
@@ -238,7 +237,7 @@ MemberTable MemberTable::GetSubset(size_t size) const {
     std::shuffle(setCopy.begin(), setCopy.end(), rGenerator_);
 
     MemberTable subsetTable;
-    for (size_t i = 0; i < size; ++i) {
+    for (size_t i = 0; i < size && i < Size(); ++i) {
         subsetTable.Insert(setCopy[i]);
     }
 

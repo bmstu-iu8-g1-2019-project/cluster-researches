@@ -3,12 +3,6 @@
 #ifndef HEADERS_BEHAVIOR_HPP_
 #define HEADERS_BEHAVIOR_HPP_
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <netinet/in.h>
-#include <unistd.h>
-
 #include <stdexcept>
 #include <thread>
 #include <deque>
@@ -30,11 +24,11 @@ public:
     std::deque<Gossip> Free();
 };
 
-int SetupSocket(in_port_t port);
-void GossipsCatching(int sd, size_t listenQueueLength, ThreadSaveGossipQueue& queue);
+boost::asio::ip::udp::socket SetupSocket(boost::asio::io_service& ioService, uint16_t port);
+void GossipsCatching(boost::asio::ip::udp::socket& sock, ThreadSaveGossipQueue& queue);
 std::deque<Conflict> UpdateTable(MemberTable& table, const std::deque<Gossip>& queue);
 std::deque<Gossip> GenerateGossips(MemberTable& table, std::deque<Gossip>& queue); // TODO: complete it
-void SendGossip(int sd, const Gossip& gossip);
+void SendGossip(boost::asio::ip::udp::socket&, const Gossip& gossip);
 
 void AppConnector(const MemberTable& table);
 

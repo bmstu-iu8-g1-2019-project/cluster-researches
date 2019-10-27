@@ -7,6 +7,7 @@
 
 #include <types.hpp>
 #include <buffer.hpp>
+#include <boost/asio/ip/udp.hpp>
 
 
 void MemberTable::DebugInsert(const Member& member) {
@@ -30,7 +31,6 @@ public:
                 "127.0.0.1",
                 "192.72.1.12",
                 "111.111.111.111",
-                "123.321.432.234",
                 "217.69.128.44",
                 "77.88.8.8",
                 "213.180.217.10",
@@ -52,7 +52,7 @@ public:
                 "213.180.216.165",
                 "213.180.216.7"
         };
-        std::vector<in_addr> uintIPVec;
+        std::vector<boost::asio::ip::address> uintIPVec;
         std::vector<uint16_t> portVec;
         std::vector<MemberAddr> addrVec;
 
@@ -63,10 +63,8 @@ public:
 
         // initialize loop
         for (size_t i = 0; i < strIPVec.size(); ++i) {
-            // uintIP
-            in_addr addr {};
-            inet_aton(strIPVec[i].c_str(), &addr);
-            uintIPVec.push_back(addr);
+            // IP
+            uintIPVec.emplace_back(boost::asio::ip::address::from_string(strIPVec[i]));
             // port
             portVec.push_back(80 + i);
             // addr

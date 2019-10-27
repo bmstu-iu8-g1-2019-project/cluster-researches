@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <boost/asio/ip/address.hpp>
 
 
 /* Member  ------------------------> 6 + 12 = 18 B
@@ -83,11 +84,11 @@ struct TimeStamp {
 
 
 struct MemberAddr : public ByteTranslatable {
-    in_addr IP;
-    in_port_t Port;
+    boost::asio::ip::address IP;
+    uint16_t Port;
 
     MemberAddr() = default;
-    MemberAddr(in_addr addr, in_port_t port);
+    MemberAddr(boost::asio::ip::address addr, in_port_t port);
 
     // We need it for `unordered_map` key hashing
     struct Hasher {
