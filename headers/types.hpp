@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <random>
 #include <deque>
+#include <mutex>
 
 #include <nlohmann/json.hpp>
 
@@ -47,18 +48,17 @@ struct Gossip;
 
 
 // Any class deriving this could be able converted to bytes
-struct ByteTranslatable {
-    virtual byte* Write(byte* bBegin, byte* bEnd) const = 0;
+struct Translatable {
+    virtual byte* Write(byte* bBegin, const byte* bEnd) const = 0;
     virtual const byte* Read(const byte* bBegin, const byte* bEnd) = 0;
     virtual size_t ByteSize() const = 0;
-};
 
-struct JSONTranslatable {
     virtual nlohmann::json ToJSON() const = 0;
 };
 
+
 template < typename Type >
-byte* WriteNumberToBytes(byte* bBegin, byte* bEnd, Type number) {
+byte* WriteNumberToBytes(byte* bBegin, const byte* bEnd, Type number) {
     if (bEnd - bBegin  < sizeof(number))
         return nullptr;
 
@@ -78,14 +78,9 @@ const byte* ReadNumberFromBytes(const byte* bBegin, const byte* bEnd, Type& numb
 }
 
 
-struct TimeStamp {
-    uint32_t Time;
-};
-
-
-struct MemberAddr : public ByteTranslatable {
+struct MemberAddr : public Translatable {
     boost::asio::ip::address IP;
-    uint16_t Port;
+    uint16_t Port = 0;
 
     MemberAddr() = default;
     MemberAddr(boost::asio::ip::address addr, in_port_t port);
@@ -95,82 +90,110 @@ struct MemberAddr : public ByteTranslatable {
         size_t operator()(const MemberAddr& key) const;
     };
 
-    byte* Write(byte* bBegin, byte* bEnd) const override ;
+    byte* Write(byte* bBegin, const byte* bEnd) const override ;
     const byte* Read(const byte* bBegin, const byte* bEnd) override;
     size_t ByteSize() const override;
+
+    virtual nlohmann::json ToJSON() const override;
 
     bool operator==(const MemberAddr& rhs) const;
 };
 
 
-struct MemberInfo : public ByteTranslatable {
+struct TimeStamp {
+    uint32_t Time = 0;
+
+    bool IsLatestThen(TimeStamp rhs) const;
+};
+
+
+struct MemberInfo : public Translatable {
     enum State {
         Alive = 0,
         Suspicious = 1,
         Dead = 2,
         Left = 3
-    } Status;
-    uint32_t Incarnation;
+    } Status = Alive;
+    uint32_t Incarnation = 0;
     TimeStamp LastUpdate;
 
     MemberInfo() = default;
     MemberInfo(State status, uint32_t incarnation, TimeStamp time);
 
-    byte* Write(byte* bBegin, byte* bEnd) const override ;
+    byte* Write(byte* bBegin, const byte* bEnd) const override ;
     const byte* Read(const byte* bBegin, const byte* bEnd) override;
     size_t ByteSize() const override;
+
+    virtual nlohmann::json ToJSON() const override;
 
     bool operator==(const MemberInfo& rhs) const;
 };
 
 
 // Here keeps all information about node
-struct Member : public ByteTranslatable, public JSONTranslatable {
+struct Member : public Translatable {
 public:
     MemberAddr Addr;
     MemberInfo Info;
 
 public:
-    Member();
+    Member() = default;
     Member(const MemberAddr& addr, const MemberInfo& info);
+
+    byte* Write(byte* bBegin, const byte* bEnd) const override;
+    const byte* Read(const byte *bBegin, const byte *bEnd) override;
+    size_t ByteSize() const override;
 
     nlohmann::json ToJSON() const override;
 
-    byte* Write(byte* bBegin, byte* bEnd) const override;
-    const byte* Read(const byte *bBegin, const byte *bEnd) override;
-    size_t ByteSize() const override;
+    bool IsLatestUpdatedThen(const Member& rhs) const;
+    bool IsStatusWorse(const Member& rhs);
 
     bool operator==(const Member& rhs) const;
 };
 
 
-struct Conflict {
-    MemberAddr Initiator;
-    MemberAddr Target;
-};
-
-
-class MemberTable : public ByteTranslatable , public JSONTranslatable {
+class MemberTable : public Translatable {
 private:
+    Member me_;
+
     std::unordered_map<MemberAddr, size_t, MemberAddr::Hasher> index_;
     std::vector<Member> set_;
+
+    std::vector<size_t> latestUpdates_;
+    // Size of subset part with latest updates
+    size_t latestUpdatesSize_;
+    // Size of subset part with random members
+    size_t randomSubsetSize_;
+
+    mutable std::mutex mutex_;
+
     mutable std::mt19937 rGenerator_;
 
 public:
     MemberTable();
+    explicit MemberTable(size_t subTableSize, size_t randomSubsetSize);
 
-    nlohmann::json ToJSON() const override;
+    MemberTable(const MemberTable& other);
+    MemberTable& operator=(const MemberTable& rhs);
 
-    byte* Write(byte* bBegin, byte* bEnd) const override;
+    void SetMe(const Member& member);
+    const Member& Me() const;
+
+    byte* Write(byte* bBegin, const byte* bEnd) const override;
     const byte* Read(const byte *bBegin, const byte *bEnd) override;
     size_t ByteSize() const override;
 
+    nlohmann::json ToJSON() const override;
+
     size_t Size() const;
 
-    void Update(const Gossip& gossip, std::deque<Conflict>& conflicts);
+    // Just updates member in table without checks
+    void Update(const Member& member);
+    std::vector<Member> TryUpdate(const MemberTable& table);
 
     Member RandomMember() const;
-    MemberTable GetSubset(size_t size) const;
+    MemberTable GetSubset() const;
 
     bool operator==(const MemberTable& rhs) const;
 
@@ -178,8 +201,17 @@ public:
     bool DebugIsExists(const Member& member) const;
 
 private:
-    void Insert(const Member& member);
-    void UpdateRecordIfNewer(const Member& member);
+    // `Func_` means that function is private
+
+    void Update_(const Member& member);
+    // If there's status conflict, `suspicion` contains worst of statuses
+    bool TryUpdate_(const Member& member, Member& suspicion);
+    std::vector<Member> TryUpdate_(const MemberTable& table);
+
+    void Insert_(const Member& member);
+    void InsertInLatest_(size_t index);
+
+    Member RandomMember_() const;
 };
 
 
@@ -212,18 +244,19 @@ private:
  * */
 
 
-struct Gossip : public ByteTranslatable {
+struct Gossip : public Translatable {
     uint16_t TTL = 0;
     Member Owner;
     Member Dest;
-    std::vector<Member> Events;
     MemberTable Table;
 
     Gossip() = default;
 
     const byte* Read(const byte* bBegin, const byte *bEnd) override;
-    byte* Write(byte* bBegin, byte* bEnd) const override;
+    byte* Write(byte* bBegin, const byte* bEnd) const override;
     size_t ByteSize() const override;
+
+    nlohmann::json ToJSON() const override;
 
     bool operator==(const Gossip& rhs) const;
 };

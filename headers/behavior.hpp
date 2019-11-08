@@ -26,9 +26,13 @@ public:
 
 boost::asio::ip::udp::socket SetupSocket(boost::asio::io_service& ioService, uint16_t port);
 void GossipsCatching(boost::asio::ip::udp::socket& sock, ThreadSaveGossipQueue& queue);
-std::deque<Conflict> UpdateTable(MemberTable& table, const std::deque<Gossip>& queue);
-std::deque<Gossip> GenerateGossips(MemberTable& table, std::deque<Gossip>& queue); // TODO: complete it
+std::deque<Member> UpdateTable(MemberTable& table, const std::deque<Gossip>& queue);
+Gossip GenerateGossip(MemberTable& table); // TODO: complete it
 void SendGossip(boost::asio::ip::udp::socket&, const Gossip& gossip);
+void SpreadGossip(boost::asio::ip::udp::socket& sock, const MemberTable& table, Gossip& gossip, size_t destNum);
+/*
+void ResolveConflicts(const std::dequ);
+*/
 
 void AppConnector(const MemberTable& table);
 

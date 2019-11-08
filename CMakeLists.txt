@@ -90,7 +90,7 @@ target_include_directories(gossip_receiving_test
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers
 )
 target_link_libraries(gossip_receiving_test
-        PUBLIC behavior
+        PUBLIC behavior GTest::main
 )
 
 enable_testing()

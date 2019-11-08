@@ -2,6 +2,7 @@
 
 #include <types.hpp>
 #include <behavior.hpp>
+#include <gtest/gtest.h>
 
 class MemberList {
 private:
@@ -76,23 +77,31 @@ public:
         return list_[generator_() % list_.size()];
     }
 
-    const std::vector<Member>& GetList() const {
+    std::vector<Member>& GetList() {
         return list_;
     }
 } list;
 
 int main() {
+    list.GetList()[0].Addr.Port = 8005;
+
+    MemberTable table;
+    for (const auto& member :  list.GetList()) {
+        table.DebugInsert(member);
+    }
+
+
     Gossip gossip;
     gossip.Owner = list.RandomMember();
 
     gossip.Owner.Addr.IP = boost::asio::ip::address_v4::loopback();
-    gossip.Owner.Addr.Port = 83;
+    gossip.Owner.Addr.Port = 8000;
 
     gossip.Dest = list.RandomMember();
     gossip.Dest.Addr.IP = gossip.Owner.Addr.IP;
-    gossip.Dest.Addr.Port = 80;
+    gossip.Dest.Addr.Port = 8005;
 
-    gossip.Events = {};
+    gossip.Table = table;
     gossip.TTL = 10;
 
     boost::asio::io_service ioService;
@@ -101,21 +110,21 @@ int main() {
     ByteBuffer bBuffer{gossip.ByteSize()};
     gossip.Write(bBuffer.Begin(), bBuffer.End());
 
-    std::cout << "Gossip content is:" << std::endl;
-
-    std::cout << "Gossip real byte size : " << gossip.ByteSize() << std::endl;
-    auto ptr = (bBuffer.Begin());
-    for (size_t i = 0; i < bBuffer.Size(); ++i) {
-        std::cout << (int) *ptr << " ";
-        ++ptr;
-        ++i;
-    }
-    std::cout << std::endl;
-
-    boost::asio::ip::udp::endpoint ep(boost::asio::ip::address::from_string("127.0.0.1"), 8005);
-    sock.send_to(boost::asio::buffer(bBuffer.Begin(), bBuffer.Size()), ep);
+    ThreadSaveGossipQueue receivedGossips;
+    std::thread catching{GossipsCatching, std::ref(sock), std::ref(receivedGossips)};
+    catching.detach();
 
     SendGossip(sock, gossip);
+    std::cout << "Sent :" << std::endl;
+    std::cout << gossip.ToJSON().dump(2) << std::endl;
+
+    std::this_thread::__sleep_for(std::chrono::seconds{2}, std::chrono::nanoseconds{0});
+
+    auto result = receivedGossips.Free();
+    if (result.empty()) {
+        std::cout << "[=================]PANIC[=================]" << std::endl;
+    }
+    EXPECT_EQ(result.front().Owner, gossip.Dest);
 
     return 0;
 }

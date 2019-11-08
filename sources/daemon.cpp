@@ -10,25 +10,28 @@ int main() {
     auto sock = SetupSocket(ioService, 8005);
 
     ThreadSaveGossipQueue threadSaveQueue;
-    
-    // TODO(AndreevSemen) : Change listening queue length for env variable
+
     std::thread threadInput{GossipsCatching, std::ref(sock), std::ref(threadSaveQueue)};
     threadInput.detach();
 
-    MemberTable table;
+    // TODO(AndreevSemen): Change this for env var
+    MemberTable table{10, 3};
 
-    //std::thread appConnector{AppConnector, std::ref(table)};
-    //appConnector.detach();
+    // std::thread appConnector{AppConnector, std::ref(table)};
+    // appConnector.detach();
 
     while (true) {
-        std::deque<Gossip> receivedGossips = threadSaveQueue.Free();
+        std::deque<Gossip> receivedGossips;
+        while (receivedGossips.empty()) {
+            receivedGossips = threadSaveQueue.Free();
+        }
+
         auto conflicts = UpdateTable(table, receivedGossips);
 
-        auto newGossips = GenerateGossips(table, receivedGossips);
+        auto newGossip = GenerateGossip(table);
 
-        for (const auto &gossip : newGossips) {
-            SendGossip(sock, gossip);
-        }
+        // TODO(AndreevSemen): Change this for env var
+        SpreadGossip(sock, table, newGossip, 100);
     }
 }
 

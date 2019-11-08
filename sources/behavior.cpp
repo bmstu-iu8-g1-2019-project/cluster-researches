@@ -27,9 +27,10 @@ boost::asio::ip::udp::socket SetupSocket(boost::asio::io_service& ioService, uin
 
 void GossipsCatching(boost::asio::ip::udp::socket& sock, ThreadSaveGossipQueue& queue) {
     // TODO(AndreevSemen): Change this for env var
+    // Max available UDP packet size
     ByteBuffer buffer{1500};
     while (true) {
-        std::cout << "Gossip catching began" << std::endl;
+        std::cout << "Gossip-catching began" << std::endl;
 
         boost::asio::ip::udp::endpoint senderEp{};
         std::cout << "Boost sock received : " << sock.receive_from(boost::asio::buffer(buffer.Begin(), buffer.Size()), senderEp) << std::endl;
@@ -37,57 +38,65 @@ void GossipsCatching(boost::asio::ip::udp::socket& sock, ThreadSaveGossipQueue& 
         Gossip gossip{};
         // Skips gossip if data unreadable (Read() returns `nullptr`)
         if (!gossip.Read(buffer.Begin(), buffer.End())) {
-            std::cout << "Gossip is invalid:" << std::endl;
+            std::cout << "Gossip is invalid" << std::endl;
             continue;
         }
 
         queue.Push(gossip);
 
-        std::cout << gossip.Owner.ToJSON() << std::endl;
+        std::cout << gossip.ToJSON().dump(2) << std::endl;
     }
 }
 
-std::deque<Conflict> UpdateTable(MemberTable& table, const std::deque<Gossip>& gossipQueue) {
-    std::deque<Conflict> conflicts;
+std::deque<Member> UpdateTable(MemberTable& table, const std::deque<Gossip>& gossipQueue) {
+    std::deque<Member> conflicts;
 
     for (const auto& gossip : gossipQueue) {
-        table.Update(gossip, conflicts);
+        if (table.Size() == 0) {
+            table.SetMe(gossip.Dest);
+        }
+
+        table.Update(gossip.Owner);
+        auto occurredConflicts = table.TryUpdate(gossip.Table);
+        conflicts.insert(conflicts.end(), occurredConflicts.begin(),
+                                          occurredConflicts.end());
     }
 
     return conflicts;
 }
 
-std::deque<Gossip> GenerateGossips(MemberTable& table, std::deque<Gossip>& queue) {
-    std::deque<Gossip> newGossips;
+Gossip GenerateGossip(MemberTable& table) {
+    Gossip gossip;
 
-    for (const auto& gossip : queue) {
-        if (queue.front().TTL == 0) {
-            queue.pop_front();
-            continue;
-        }
+    gossip.TTL = 1;
+    gossip.Owner = table.Me();
+    gossip.Dest = table.RandomMember();
+    gossip.Table = table.GetSubset();
 
-        Gossip newGossip{};
-        newGossip.TTL = gossip.TTL - 1;
-        newGossip.Owner = gossip.Dest;
-        newGossip.Dest = table.RandomMember();
-        newGossip.Events = gossip.Events;
-        // TODO : Change it for env var
-        newGossip.Table = table.GetSubset(4);
-
-        newGossips.push_back(newGossip);
-
-        queue.pop_front();
-    }
-
-    return newGossips;
+    return gossip;
 }
 
 void SendGossip(boost::asio::ip::udp::socket& sock, const Gossip& gossip) {
+    // Creates buffer and write gossip to buffer
     ByteBuffer buffer{gossip.ByteSize()};
-    gossip.Write(buffer.Begin(), buffer.End());
 
-    boost::asio::ip::udp::endpoint destEp{gossip.Owner.Addr.IP, gossip.Owner.Addr.Port};
+    if (!gossip.Write(buffer.Begin(), buffer.End())) {
+        std::cout << "Gossip couldn't be written" << std::endl;
+        return;
+    }
+
+    // Chooses endpoint (dest) and sends gossip
+    boost::asio::ip::udp::endpoint destEp{gossip.Dest.Addr.IP, gossip.Dest.Addr.Port};
     sock.send_to(boost::asio::buffer(buffer.Begin(), buffer.Size()), destEp);
+}
+
+void SpreadGossip(boost::asio::ip::udp::socket& sock, const MemberTable& table, Gossip& gossip, size_t destNum) {
+    for (size_t i = 0; i < destNum; ++i) {
+        if (table.Size() != 0) {
+            gossip.Dest = table.RandomMember();
+        }
+        SendGossip(sock, gossip);
+    }
 }
 
 void AppConnector(const MemberTable& table) {

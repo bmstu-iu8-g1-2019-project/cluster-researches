@@ -7,16 +7,8 @@
 
 #include <types.hpp>
 #include <buffer.hpp>
-#include <boost/asio/ip/udp.hpp>
 
 
-void MemberTable::DebugInsert(const Member& member) {
-    Insert(member);
-}
-
-bool MemberTable::DebugIsExists(const Member& member) const {
-    return index_.find(member.Addr) != index_.end();
-}
 
 class MemberList {
 private:
