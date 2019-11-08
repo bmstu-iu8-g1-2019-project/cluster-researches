@@ -6,16 +6,24 @@
 
 
 int main() {
+    SetupConfig("config.conf");
+
+    MemberTable table{gVar.TableLatestUpdatesSize, gVar.TableRandomMembersSize};
+    table.SetMe(Member{gVar.Address,
+                MemberInfo{MemberInfo::State::Alive, 0, TimeStamp{0}}});
+    table.FromJson(gVar.jsonTable);
+    gVar.jsonTable.clear();
+
     boost::asio::io_service ioService;
-    auto sock = SetupSocket(ioService, 8005);
+    auto sock = SetupSocket(ioService, gVar.Address.Port);
 
     ThreadSaveGossipQueue threadSaveQueue;
 
     std::thread threadInput{GossipsCatching, std::ref(sock), std::ref(threadSaveQueue)};
     threadInput.detach();
 
-    // TODO(AndreevSemen): Change this for env var
-    MemberTable table{10, 3};
+    std::thread pingingThread{MemberPinging, std::ref(sock), std::ref(table)};
+    pingingThread.detach();
 
     // std::thread appConnector{AppConnector, std::ref(table)};
     // appConnector.detach();
@@ -30,8 +38,7 @@ int main() {
 
         auto newGossip = GenerateGossip(table);
 
-        // TODO(AndreevSemen): Change this for env var
-        SpreadGossip(sock, table, newGossip, 100);
+        SpreadGossip(sock, table, newGossip, gVar.SpreadNumber);
     }
 }
 

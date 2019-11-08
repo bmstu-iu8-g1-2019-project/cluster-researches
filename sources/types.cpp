@@ -48,6 +48,11 @@ nlohmann::json MemberAddr::ToJSON() const {
     return std::move(object);
 }
 
+void MemberAddr::FromJson(const nlohmann::json& json) {
+    IP = boost::asio::ip::address_v4::from_string(std::string{json["IP"]});
+    Port = json["port"];
+}
+
 bool MemberAddr::operator==(const MemberAddr &rhs) const {
     return IP == rhs.IP && Port == rhs.Port;
 }
@@ -123,6 +128,25 @@ nlohmann::json MemberInfo::ToJSON() const {
     return std::move(object);
 }
 
+void MemberInfo::FromJson(const nlohmann::json& json) {
+    std::string status{json["status"]};
+
+    if (status == "alive") {
+        Status = MemberInfo::State::Alive;
+    } else if (status == "suspicious") {
+        Status = MemberInfo::State::Suspicious;
+    } else if (status == "dead") {
+        Status = MemberInfo::State::Dead;
+    } else if (status == "left") {
+        Status = MemberInfo::State::Left;
+    } else {
+        Status = MemberInfo::State::Unknown;
+    }
+
+    Incarnation = json["incarnation"];
+    LastUpdate.Time = json["timestamp"];
+}
+
 bool MemberInfo::operator==(const MemberInfo &rhs) const {
     return Status == rhs.Status && Incarnation == rhs.Incarnation;
 }
@@ -157,6 +181,11 @@ nlohmann::json Member::ToJSON() const {
     object["info"] = Info.ToJSON();
 
     return std::move(object);
+}
+
+void Member::FromJson(const nlohmann::json& json) {
+    Addr.FromJson(json["address"]);
+    Info.FromJson(json["info"]);
 }
 
 bool Member::operator==(const Member &rhs) const {
@@ -269,6 +298,16 @@ nlohmann::json MemberTable::ToJSON() const {
     }
 
     return std::move(array);
+}
+
+void MemberTable::FromJson(const nlohmann::json& json) {
+    std::lock_guard<std::mutex> lock{mutex_};
+
+    for (const auto& jsonMember : json) {
+        Member member{};
+        member.FromJson(jsonMember);
+        Insert_(member);
+    }
 }
 
 void MemberTable::Update(const Member& member) {
@@ -473,6 +512,13 @@ nlohmann::json Gossip::ToJSON() const {
     object["table"] = Table.ToJSON();
 
     return std::move(object);
+}
+
+void Gossip::FromJson(const nlohmann::json& json) {
+    TTL = json["TTL"];
+    Owner.FromJson(json["owner"]);
+    Dest.FromJson(json["dest"]);
+    Table.FromJson(json["table"]);
 }
 
 bool Gossip::operator==(const Gossip& rhs) const {

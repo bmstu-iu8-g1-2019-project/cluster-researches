@@ -37,8 +37,6 @@
 
 using byte = uint8_t;
 
-struct ByteTranslatable;
-
 struct MemberAddr;
 struct MemberInfo;
 struct TimeStamp;
@@ -54,6 +52,7 @@ struct Translatable {
     virtual size_t ByteSize() const = 0;
 
     virtual nlohmann::json ToJSON() const = 0;
+    virtual void FromJson(const nlohmann::json& json) = 0;
 };
 
 
@@ -94,7 +93,8 @@ struct MemberAddr : public Translatable {
     const byte* Read(const byte* bBegin, const byte* bEnd) override;
     size_t ByteSize() const override;
 
-    virtual nlohmann::json ToJSON() const override;
+    nlohmann::json ToJSON() const override;
+    void FromJson(const nlohmann::json& json) override;
 
     bool operator==(const MemberAddr& rhs) const;
 };
@@ -112,7 +112,8 @@ struct MemberInfo : public Translatable {
         Alive = 0,
         Suspicious = 1,
         Dead = 2,
-        Left = 3
+        Left = 3,
+        Unknown = -1
     } Status = Alive;
     uint32_t Incarnation = 0;
     TimeStamp LastUpdate;
@@ -124,7 +125,8 @@ struct MemberInfo : public Translatable {
     const byte* Read(const byte* bBegin, const byte* bEnd) override;
     size_t ByteSize() const override;
 
-    virtual nlohmann::json ToJSON() const override;
+    nlohmann::json ToJSON() const override;
+    void FromJson(const nlohmann::json& json) override;
 
     bool operator==(const MemberInfo& rhs) const;
 };
@@ -145,6 +147,7 @@ public:
     size_t ByteSize() const override;
 
     nlohmann::json ToJSON() const override;
+    void FromJson(const nlohmann::json& json) override;
 
     bool IsLatestUpdatedThen(const Member& rhs) const;
     bool IsStatusWorse(const Member& rhs);
@@ -185,6 +188,7 @@ public:
     size_t ByteSize() const override;
 
     nlohmann::json ToJSON() const override;
+    void FromJson(const nlohmann::json& json) override;
 
     size_t Size() const;
 
@@ -257,8 +261,24 @@ struct Gossip : public Translatable {
     size_t ByteSize() const override;
 
     nlohmann::json ToJSON() const override;
+    void FromJson(const nlohmann::json& json) override;
 
     bool operator==(const Gossip& rhs) const;
 };
+
+
+struct Variables {
+    MemberAddr Address;
+    size_t TableLatestUpdatesSize;
+    size_t TableRandomMembersSize;
+    size_t SpreadNumber;
+    size_t ReceivingBufferSize;
+    std::chrono::seconds PingInterval;
+    std::string UNIXSocketPath;
+
+    nlohmann::json jsonTable;
+};
+
+Variables gVar;
 
 #endif // HEADERS_TYPES_HPP_

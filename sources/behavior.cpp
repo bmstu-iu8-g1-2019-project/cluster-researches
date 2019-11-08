@@ -16,6 +16,21 @@ std::deque<Gossip> ThreadSaveGossipQueue::Free() {
     return std::move(bucket);
 }
 
+Variables SetupConfig(const std::string& configPath) {
+    nlohmann::json config = nlohmann::json::parse(configPath);
+
+    Variables vars{};
+    vars.Address.FromJson(config["address"]);
+    vars.TableLatestUpdatesSize = config["TableLatestUpdatesSize"];
+    vars.TableRandomMembersSize = config["TableRandomMembersSize"];
+    vars.SpreadNumber = config["SpreadNumber"];
+    vars.ReceivingBufferSize = config["ReceivingBufferSize"];
+    vars.PingInterval = std::chrono::seconds{config["PingInterval"]};
+    vars.UNIXSocketPath = config["UNIXSocketPath"];
+
+    vars.jsonTable = config["table"];
+}
+
 boost::asio::ip::udp::socket SetupSocket(boost::asio::io_service& ioService, uint16_t port) {
     using namespace boost::asio;
     ip::udp::socket sock(ioService, ip::udp::endpoint{ip::address_v4::any(), port});
@@ -26,9 +41,8 @@ boost::asio::ip::udp::socket SetupSocket(boost::asio::io_service& ioService, uin
 }
 
 void GossipsCatching(boost::asio::ip::udp::socket& sock, ThreadSaveGossipQueue& queue) {
-    // TODO(AndreevSemen): Change this for env var
     // Max available UDP packet size
-    ByteBuffer buffer{1500};
+    ByteBuffer buffer{gVar.ReceivingBufferSize};
     while (true) {
         std::cout << "Gossip-catching began" << std::endl;
 
@@ -48,15 +62,27 @@ void GossipsCatching(boost::asio::ip::udp::socket& sock, ThreadSaveGossipQueue& 
     }
 }
 
+void MemberPinging(boost::asio::ip::udp::socket& sock, MemberTable& table) {
+    while (true) {
+        if (table.Size() != 0) {
+            auto gossip = GenerateGossip(table);
+            gossip.Dest = table.RandomMember();
+
+            SendGossip(sock, gossip);
+
+            std::this_thread::sleep_for(std::chrono::seconds{gVar.PingInterval});
+        }
+    }
+}
+
 std::deque<Member> UpdateTable(MemberTable& table, const std::deque<Gossip>& gossipQueue) {
     std::deque<Member> conflicts;
 
     for (const auto& gossip : gossipQueue) {
-        if (table.Size() == 0) {
-            table.SetMe(gossip.Dest);
-        }
+        auto owner = gossip.Owner;
+        owner.Info.LastUpdate.Time = std::clock();
+        table.Update(owner);
 
-        table.Update(gossip.Owner);
         auto occurredConflicts = table.TryUpdate(gossip.Table);
         conflicts.insert(conflicts.end(), occurredConflicts.begin(),
                                           occurredConflicts.end());
@@ -104,8 +130,8 @@ void AppConnector(const MemberTable& table) {
 
     sockaddr_un path{};
     path.sun_family = AF_UNIX;
-    // TODO : Change it for env var
-    std::string str{"./socket.sock"};
+
+    std::string str{gVar.UNIXSocketPath};
     std::copy(str.cbegin(), str.cend(), path.sun_path);
 
     if (bind(sd, (sockaddr*) &path, sizeof(path)) == -1) {

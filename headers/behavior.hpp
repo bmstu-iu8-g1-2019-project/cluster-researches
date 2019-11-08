@@ -24,8 +24,10 @@ public:
     std::deque<Gossip> Free();
 };
 
+Variables SetupConfig(const std::string& configPath);
 boost::asio::ip::udp::socket SetupSocket(boost::asio::io_service& ioService, uint16_t port);
 void GossipsCatching(boost::asio::ip::udp::socket& sock, ThreadSaveGossipQueue& queue);
+void MemberPinging(boost::asio::ip::udp::socket& sock, MemberTable& table);
 std::deque<Member> UpdateTable(MemberTable& table, const std::deque<Gossip>& queue);
 Gossip GenerateGossip(MemberTable& table); // TODO: complete it
 void SendGossip(boost::asio::ip::udp::socket&, const Gossip& gossip);
