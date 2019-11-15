@@ -45,7 +45,7 @@ nlohmann::json MemberAddr::ToJSON() const {
     object["IP"] = IP.to_string();
     object["port"] = Port;
 
-    return std::move(object);
+    return object;
 }
 
 void MemberAddr::FromJson(const nlohmann::json& json) {
@@ -60,6 +60,14 @@ bool MemberAddr::operator==(const MemberAddr &rhs) const {
 
 bool TimeStamp::IsLatestThen(TimeStamp rhs) const {
     return Time >= rhs.Time;
+}
+
+std::chrono::seconds TimeStamp::Delay(TimeStamp rhs) const {
+    return std::chrono::duration_cast<std::chrono::seconds>(rhs.Time - Time);
+}
+
+TimeStamp TimeStamp::Now() {
+    return TimeStamp{std::chrono::system_clock::now()};
 }
 
 
@@ -123,9 +131,9 @@ nlohmann::json MemberInfo::ToJSON() const {
     }
     object["status"] = status;
     object["incarnation"] = Incarnation;
-    object["timestamp"] = LastUpdate.Time;
+    // object["timestamp"] = LastUpdate.Time;
 
-    return std::move(object);
+    return object;
 }
 
 void MemberInfo::FromJson(const nlohmann::json& json) {
@@ -144,7 +152,7 @@ void MemberInfo::FromJson(const nlohmann::json& json) {
     }
 
     Incarnation = json["incarnation"];
-    LastUpdate.Time = json["timestamp"];
+    // LastUpdate.Time = json["timestamp"];
 }
 
 bool MemberInfo::operator==(const MemberInfo &rhs) const {
@@ -180,7 +188,7 @@ nlohmann::json Member::ToJSON() const {
     object["address"] = Addr.ToJSON();
     object["info"] = Info.ToJSON();
 
-    return std::move(object);
+    return object;
 }
 
 void Member::FromJson(const nlohmann::json& json) {
@@ -196,7 +204,7 @@ bool Member::IsLatestUpdatedThen(const Member& rhs) const {
     return Info.LastUpdate.IsLatestThen(rhs.Info.LastUpdate);
 }
 
-bool Member::IsStatusWorse(const Member& rhs) {
+bool Member::IsStatusWorse(const Member& rhs) const {
     return Info.Status > rhs.Info.Status;
 }
 
@@ -297,7 +305,7 @@ nlohmann::json MemberTable::ToJSON() const {
         array.push_back(member.ToJSON());
     }
 
-    return std::move(array);
+    return array;
 }
 
 void MemberTable::FromJson(const nlohmann::json& json) {
@@ -362,7 +370,7 @@ bool MemberTable::TryUpdate_(const Member& member, Member& suspicion) {
 std::vector<Member> MemberTable::TryUpdate(const MemberTable& table) {
     std::lock_guard<std::mutex> lock{mutex_};
 
-    return std::move(TryUpdate_(table));
+    return TryUpdate_(table);
 }
 
 std::vector<Member> MemberTable::TryUpdate_(const MemberTable& table) {
@@ -370,7 +378,7 @@ std::vector<Member> MemberTable::TryUpdate_(const MemberTable& table) {
 
     Member conflict{};
     for (const auto& member : table.set_) {
-        if (member == Me()) {
+        if (member.Addr == me_.Addr) {
             continue;
         }
 
@@ -379,14 +387,13 @@ std::vector<Member> MemberTable::TryUpdate_(const MemberTable& table) {
         }
     }
 
-    return std::move(conflicts);
+    return conflicts;
 }
 
 Member MemberTable::RandomMember() const {
     std::lock_guard<std::mutex> lock{mutex_};
 
     return RandomMember_();
-
 }
 
 Member MemberTable::RandomMember_() const {
@@ -401,7 +408,8 @@ MemberTable MemberTable::GetSubset() const {
         subsetTable.Insert_(set_[latestIndex]);
     }
 
-    for (size_t i = 0; i < randomSubsetSize_ || i < Size() - latestUpdatesSize_;) {
+    size_t insertedRandomly = 0;
+    for (size_t i = 0; i < Size_(); ++i) {
         auto member = RandomMember_();
         auto foundInIndex = index_.find(member.Addr);
 
@@ -409,11 +417,28 @@ MemberTable MemberTable::GetSubset() const {
                                                 foundInIndex->second) ==
             latestUpdates_.end()) {
             subsetTable.Insert_(member);
-            ++i;
+            ++insertedRandomly;
+
+            if (insertedRandomly == randomSubsetSize_) {
+                break;
+            }
         }
     }
 
     return subsetTable;
+}
+
+std::deque<Member> MemberTable::GetDestQueue() const {
+    std::lock_guard lock{mutex_};
+
+    std::deque<Member> queue;
+    for (const auto& member : set_) {
+        queue.push_back(member);
+    }
+
+    std::shuffle(queue.begin(), queue.end(), rGenerator_);
+
+    return queue;
 }
 
 bool MemberTable::operator==(const MemberTable& rhs) const {
@@ -432,6 +457,10 @@ bool MemberTable::operator==(const MemberTable& rhs) const {
 size_t MemberTable::Size() const {
     std::lock_guard<std::mutex> lock{mutex_};
 
+    return Size_();
+}
+
+size_t MemberTable::Size_() const {
     return set_.size();
 }
 
@@ -473,7 +502,7 @@ bool MemberTable::DebugIsExists(const Member& member) const {
 
 const byte* Gossip::Read(const byte *bBegin, const byte* bEnd) {
     size_t size = 0;
-    if (!(bBegin = ReadNumberFromBytes(bBegin, bEnd, TTL)))
+    if (!(bBegin = ReadNumberFromBytes(bBegin, bEnd, Type)))
         return nullptr;
     if (!(bBegin = Owner.Read(bBegin, bEnd)))
         return nullptr;
@@ -485,7 +514,7 @@ const byte* Gossip::Read(const byte *bBegin, const byte* bEnd) {
 
 
 byte* Gossip::Write(byte *bBegin, const byte *bEnd) const {
-    if (!(bBegin = WriteNumberToBytes(bBegin, bEnd, TTL)))
+    if (!(bBegin = WriteNumberToBytes(bBegin, bEnd, Type)))
         return nullptr;
     if (!(bBegin = Owner.Write(bBegin, bEnd)))
         return nullptr;
@@ -496,7 +525,7 @@ byte* Gossip::Write(byte *bBegin, const byte *bEnd) const {
 }
 
 size_t Gossip::ByteSize() const {
-    return sizeof(TTL) +
+    return sizeof(Type) +
            Owner.ByteSize() +
            Dest.ByteSize() +
            sizeof(size_t) +
@@ -506,23 +535,45 @@ size_t Gossip::ByteSize() const {
 nlohmann::json Gossip::ToJSON() const {
     auto object = nlohmann::json::object();
 
-    object["TTL"] = TTL;
+    std::string strType;
+    switch (Type) {
+        case GossipType::Ping :
+            strType = "ping";
+            break;
+        case GossipType::Ack :
+            strType = "ack";
+            break;
+        case GossipType::Spread :
+            strType = "spread";
+            break;
+        default :
+            strType = "default";
+    }
+    object["Type"] = strType;
     object["owner"] = Owner.ToJSON();
     object["dest"] = Dest.ToJSON();
     object["table"] = Table.ToJSON();
 
-    return std::move(object);
+    return object;
 }
 
 void Gossip::FromJson(const nlohmann::json& json) {
-    TTL = json["TTL"];
+    if (json["type"] == "ping") {
+        Type = GossipType::Ping;
+    } else if (json["type"] == "ack") {
+        Type = GossipType::Ack;
+    } else if (json["type"] == "spread") {
+        Type = GossipType::Spread;
+    } else {
+        Type = GossipType::Default;
+    }
     Owner.FromJson(json["owner"]);
     Dest.FromJson(json["dest"]);
     Table.FromJson(json["table"]);
 }
 
 bool Gossip::operator==(const Gossip& rhs) const {
-    return TTL == rhs.TTL &&
+    return Type == rhs.Type &&
            Owner == rhs.Owner &&
            Dest == rhs.Dest &&
            Table == rhs.Table;

@@ -101,9 +101,12 @@ struct MemberAddr : public Translatable {
 
 
 struct TimeStamp {
-    uint32_t Time = 0;
+    std::chrono::system_clock::time_point Time;
 
     bool IsLatestThen(TimeStamp rhs) const;
+    std::chrono::seconds Delay(TimeStamp rhs) const;
+
+    static TimeStamp Now();
 };
 
 
@@ -150,7 +153,7 @@ public:
     void FromJson(const nlohmann::json& json) override;
 
     bool IsLatestUpdatedThen(const Member& rhs) const;
-    bool IsStatusWorse(const Member& rhs);
+    bool IsStatusWorse(const Member& rhs) const;
 
     bool operator==(const Member& rhs) const;
 };
@@ -199,6 +202,8 @@ public:
     Member RandomMember() const;
     MemberTable GetSubset() const;
 
+    std::deque<Member> GetDestQueue() const;
+
     bool operator==(const MemberTable& rhs) const;
 
     void DebugInsert(const Member& member);
@@ -207,6 +212,7 @@ public:
 private:
     // `Func_` means that function is private
 
+    size_t Size_() const;
     void Update_(const Member& member);
     // If there's status conflict, `suspicion` contains worst of statuses
     bool TryUpdate_(const Member& member, Member& suspicion);
@@ -249,7 +255,13 @@ private:
 
 
 struct Gossip : public Translatable {
-    uint16_t TTL = 0;
+    enum GossipType {
+        Spread = 0,
+        Ping = 1,
+        Ack = 2,
+        Default = -1
+    } Type = Default;
+
     Member Owner;
     Member Dest;
     MemberTable Table;
@@ -276,9 +288,7 @@ struct Variables {
     std::chrono::seconds PingInterval;
     std::string UNIXSocketPath;
 
-    nlohmann::json jsonTable;
+    nlohmann::json NodeList;
 };
-
-Variables gVar;
 
 #endif // HEADERS_TYPES_HPP_

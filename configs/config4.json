@@ -1,0 +1,26 @@
+{
+  "address" : {
+    "IP" : "127.0.0.1",
+    "port" : 8003
+  },
+  "TableLatestUpdatesSize" : 5,
+  "TableRandomMembersSize" : 10,
+  "SpreadNumber" : 4,
+  "ReceivingBufferSize" : 1500,
+  "PingInterval" : 1,
+  "UNIXSocketPath" : "./socket.sock",
+  "NodeList" : [
+    {
+      "IP" : "127.0.0.1",
+      "port" : 8000
+    },
+    {
+      "IP" : "127.0.0.1",
+      "port" : 8001
+    },
+    {
+      "IP" : "127.0.0.1",
+      "port" : 8002
+    }
+  ]
+}
