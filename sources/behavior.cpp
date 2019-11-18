@@ -45,21 +45,21 @@ void GossipsCatching(boost::asio::ip::udp::socket& sock, ThreadSaveGossipQueue<G
             continue;
         }
 
-        std::cout << "[RECEIVED]:";
+        std::cout << "[RECV]:";
         if (gossip.Type == Gossip::GossipType::Ping ||
             gossip.Type == Gossip::GossipType::Ack) {
             if (gossip.Type == Gossip::GossipType::Ping) {
-                std::cout << "[PING]:" << std::endl;
-                //std::cout << gossip.ToJSON().dump(2) << std::endl;
+                std::cout << "[PING]:";
+                std::cout << gossip.Owner.ToJSON().dump() << std::endl;
             } else {
-                std::cout << "[ACK]:" << std::endl;
-                //std::cout << gossip.ToJSON().dump(2) << std::endl;
+                std::cout << "[ACK ]:";
+                std::cout << gossip.Owner.ToJSON().dump() << std::endl;
             }
 
             fd.Push(gossip);
         } else if (gossip.Type == Gossip::GossipType::Spread) {
-            std::cout << "[SPREAD]:" << std::endl;
-            //std::cout << gossip.ToJSON().dump(2) << std::endl;
+            std::cout << "[SPRD]:";
+            std::cout << gossip.Owner.ToJSON().dump() << std::endl;
 
             spread.Push(gossip);
         }
@@ -137,8 +137,9 @@ void FailureDetection(boost::asio::ip::udp::socket& sock, MemberTable& table, Th
         for (const auto& member : conflicts) {
             gossip.Dest = member;
 
-            std::cout << "[CONFLICT]";
+            std::cout << "[CONFL ]:";
             SendGossip(sock, gossip);
+            std::cout << member.ToJSON() << std::endl;
         }
 
         std::this_thread::sleep_for(std::chrono::seconds{gVar.PingInterval});
@@ -215,7 +216,7 @@ void SpreadGossip(boost::asio::ip::udp::socket& sock, const MemberTable& table, 
 void AppConnector(const MemberTable& table, uint16_t port) {
     using namespace boost::asio;
 
-    io_service ioService;
+    /*io_service ioService;
     ip::tcp::socket sock(ioService, ip::tcp::endpoint{ip::address_v4::any(), port});
 
     sock.connect(ip::tcp::endpoint{ip::address_v4::from_string("127.0.0.1"), port});
@@ -224,5 +225,5 @@ void AppConnector(const MemberTable& table, uint16_t port) {
         sock.send(boost::asio::buffer(table.ToJSON().dump()));
 
         std::this_thread::sleep_for(std::chrono::seconds{gVar.PingInterval});
-    }
+    }*/
 }

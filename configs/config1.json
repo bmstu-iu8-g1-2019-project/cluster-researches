@@ -3,6 +3,7 @@
     "IP" : "127.0.0.1",
     "port" : 8000
   },
+  "observe-port" : 7999,
   "TableLatestUpdatesSize" : 10,
   "TableRandomMembersSize" : 5,
   "SpreadNumber" : 4,
