@@ -1,0 +1,33 @@
+syntax = "proto2";
+
+package gossip;
+
+message MemberAddr {
+  required uint32 IP = 1;
+  required uint32 port = 2;
+}
+
+message TimeStamp {
+  required uint32 time = 1;
+}
+
+message MemberInfo {
+  enum State {
+    ALIVE = 0;
+    SUSPICIOUS = 1;
+    DEAD = 2;
+  }
+
+  required State status = 1;
+  required uint32 incarnation = 2;
+  required TimeStamp time_stamp = 3;
+}
+
+message Member {
+  required MemberAddr addr = 1;
+  required MemberInfo info = 2;
+}
+
+message Table {
+  repeated Member table = 1;
+}
