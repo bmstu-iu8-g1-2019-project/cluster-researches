@@ -26,9 +26,9 @@ int main(int argc, char** argv) {
     boost::asio::io_service ioService;
     auto sock = SetupSocket(ioService, gVar.Address.Port);
 
-    ThreadSaveGossipQueue<Gossip> spreadQueue;
-    ThreadSaveGossipQueue<Gossip> fdQueue; // failure detection queue
-    ThreadSaveGossipQueue<Member> conflictQueue;
+    ThreadSaveQueue<Gossip> spreadQueue;
+    ThreadSaveQueue<Gossip> fdQueue; // failure detection queue
+    ThreadSaveQueue<Member> conflictQueue;
 
     std::thread inputThread{GossipsCatching, std::ref(sock), std::ref(spreadQueue),
                                                              std::ref(fdQueue)};

@@ -21,21 +21,19 @@ Variables SetupConfig(const std::string& configPath) {
     return vars;
 }
 
-boost::asio::ip::udp::socket SetupSocket(boost::asio::io_service& ioService, uint16_t port) {
-    using namespace boost::asio;
-    ip::udp::socket sock(ioService, ip::udp::endpoint{ip::address_v4::any(), port});
+udpSocket SetupSocket(boost::asio::io_service& ioService, uint16_t port) {
+    udpSocket sock(ioService, ip4Endpoint{ip4::any(), port});
 
-    sock.set_option(boost::asio::ip::udp::socket::reuse_address{});
+    sock.set_option(udpSocket::reuse_address{});
 
     return sock;
 }
 
-void GossipsCatching(boost::asio::ip::udp::socket& sock, ThreadSaveGossipQueue<Gossip>& spread,
-                                                         ThreadSaveGossipQueue<Gossip>& fd) {
+void GossipsCatching(udpSocket& sock, ThreadSaveQueue<Gossip>& spread, ThreadSaveQueue<Gossip>& fd) {
     // Max available UDP packet size
     ByteBuffer buffer{gVar.ReceivingBufferSize};
     while (true) {
-        boost::asio::ip::udp::endpoint senderEp{};
+        ip4Endpoint senderEp{};
         sock.receive_from(boost::asio::buffer(buffer.Begin(), buffer.Size()), senderEp);
 
         Gossip gossip{};
@@ -46,9 +44,9 @@ void GossipsCatching(boost::asio::ip::udp::socket& sock, ThreadSaveGossipQueue<G
         }
 
         std::cout << "[RECV]:";
-        if (gossip.Type == Gossip::GossipType::Ping ||
-            gossip.Type == Gossip::GossipType::Ack) {
-            if (gossip.Type == Gossip::GossipType::Ping) {
+        if (gossip.Type == Gossip::Ping ||
+            gossip.Type == Gossip::Ack) {
+            if (gossip.Type == Gossip::Ping) {
                 std::cout << "[PING]:";
                 std::cout << gossip.Owner.ToJSON().dump() << std::endl;
             } else {
@@ -66,8 +64,7 @@ void GossipsCatching(boost::asio::ip::udp::socket& sock, ThreadSaveGossipQueue<G
     }
 }
 
-void FailureDetection(boost::asio::ip::udp::socket& sock, MemberTable& table, ThreadSaveGossipQueue<Gossip>& fdQueue,
-                                                                              ThreadSaveGossipQueue<Member>& conflictQueue) {
+void FailureDetection(udpSocket& sock, MemberTable& table, ThreadSaveQueue<Gossip>& fdQueue, ThreadSaveQueue<Member>& conflictQueue) {
     while (table.Size() == 0);
 
     std::vector<std::pair<Member, TimeStamp>> await;
@@ -81,8 +78,8 @@ void FailureDetection(boost::asio::ip::udp::socket& sock, MemberTable& table, Th
         // if Ping : send ack
         // if Ack : remove from awaiting list
         for (const auto& gossip : gossips) {
-            if (gossip.Type == Gossip::GossipType::Ping) {
-                auto ack = GenerateGossip(table, Gossip::GossipType::Ack);
+            if (gossip.Type == Gossip::Ping) {
+                auto ack = GenerateGossip(table, Gossip::Ack);
                 ack.Dest = gossip.Owner;
 
                 SendGossip(sock, ack);
@@ -105,11 +102,11 @@ void FailureDetection(boost::asio::ip::udp::socket& sock, MemberTable& table, Th
             // TODO(AndreevSemen) : change for env
             if (iter->second.Delay(TimeStamp::Now()) > std::chrono::seconds{1}) {
                 switch (iter->first.Info.Status) {
-                    case MemberInfo::State::Alive :
-                        iter->first.Info.Status = MemberInfo::State::Suspicious;
+                    case MemberInfo::Alive :
+                        iter->first.Info.Status = MemberInfo::Suspicious;
                         break;
-                    case MemberInfo::State::Suspicious :
-                        iter->first.Info.Status = MemberInfo::State::Dead;
+                    case MemberInfo::Suspicious :
+                        iter->first.Info.Status = MemberInfo::Dead;
                         break;
                     default:
                         break;
@@ -123,10 +120,10 @@ void FailureDetection(boost::asio::ip::udp::socket& sock, MemberTable& table, Th
             }
         }
 
-        auto gossip = GenerateGossip(table, Gossip::GossipType::Ping);
+        auto gossip = GenerateGossip(table, Gossip::Ping);
         do {
             gossip.Dest = table.RandomMember();
-        } while (gossip.Dest.Info.Status == MemberInfo::State::Left);
+        } while (gossip.Dest.Info.Status == MemberInfo::Left);
 
         std::cout << "[PING]:";
         SendGossip(sock, gossip);
@@ -181,9 +178,9 @@ Gossip GenerateGossip(MemberTable& table, Gossip::GossipType type) {
     return gossip;
 }
 
-void SendGossip(boost::asio::ip::udp::socket& sock, const Gossip& gossip) {
+void SendGossip(udpSocket& sock, const Gossip& gossip) {
     // Creates buffer and write gossip to buffer
-    if (gossip.Type == Gossip::GossipType::Default) {
+    if (gossip.Type == Gossip::Default) {
         std::cout << "+=+=+=+=Gossip type couldn't be default" << std::endl;
         return;
     }
@@ -200,7 +197,7 @@ void SendGossip(boost::asio::ip::udp::socket& sock, const Gossip& gossip) {
     std::cout << "[SENT]:[TO]:" << gossip.Dest.ToJSON() << std::endl;
 }
 
-void SpreadGossip(boost::asio::ip::udp::socket& sock, const MemberTable& table, std::deque<Member>& destQueue, Gossip& gossip, size_t destNum) {
+void SpreadGossip(udpSocket& sock, const MemberTable& table, std::deque<Member>& destQueue, Gossip& gossip, size_t destNum) {
     for (size_t i = 0; i < destNum || i < table.Size(); ++i) {
         if (destQueue.empty()) {
             destQueue = table.GetDestQueue();

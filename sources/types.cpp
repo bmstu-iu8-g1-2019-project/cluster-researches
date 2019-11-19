@@ -155,6 +155,11 @@ void MemberInfo::FromJson(const nlohmann::json& json) {
     // LastUpdate.Time = json["timestamp"];
 }
 
+int MemberInfo::IncarnationDiff(const MemberInfo& oth) const {
+    // Необходимо преобразование типов
+    return static_cast<int>(this->Incarnation) - oth.Incarnation;
+}
+
 bool MemberInfo::operator==(const MemberInfo &rhs) const {
     return Status == rhs.Status && Incarnation == rhs.Incarnation;
 }
@@ -340,13 +345,14 @@ void MemberTable::Update_(const Member& member) {
 bool MemberTable::TryUpdate_(const Member& member, Member& suspicion) {
     auto found = index_.find(member.Addr);
 
+    // Если до этого member был неизвестен
     if (found == index_.end()) {
         Insert_(member);
         return true;
     }
 
     // If new incarnation
-    if (set_[found->second].Info.Incarnation < member.Info.Incarnation) {
+    if (set_[found->second].Info.IncarnationDiff(member.Info) < 0) {
         Update_(member);
         return true;
     }
@@ -357,12 +363,13 @@ bool MemberTable::TryUpdate_(const Member& member, Member& suspicion) {
     }
 
     // If `member.Status` better (we have: "dead", `member` have :"alive")
+    // We need check truth
     if (set_[found->second].IsStatusWorse(member)) {
         suspicion = set_[found->second];
         return false;
     }
 
-    // If `member.Info` is reliable
+    // If other reliable case `member.Info`
     Update_(member);
     return true;
 }
@@ -403,11 +410,25 @@ Member MemberTable::RandomMember_() const {
 MemberTable MemberTable::GetSubset() const {
     std::lock_guard<std::mutex> lock{mutex_};
 
+    // Создаем вектор vec = {0, 1, ..., size -1}, из которого уберем индексы последних обновлений
+    // В итоге получим индексы всех остальных (самых старых обновлений)
+    std::vector<size_t> earliestUpdates{};
+    earliestUpdates.resize(Size_(), 0);
+    std::iota(earliestUpdates.begin(), earliestUpdates.end(), 0);
+
     MemberTable subsetTable{};
     for (const auto& latestIndex : latestUpdates_) {
         subsetTable.Insert_(set_[latestIndex]);
+
+        // Делаем MemberTable
+        earliestUpdates.erase(std::find(earliestUpdates.begin(),
+                                        earliestUpdates.end(),
+                                        latestIndex));
     }
 
+    std::shuffle(earliestUpdates.begin(), earliestUpdates.end(), rGenerator_);
+
+    /*
     size_t insertedRandomly = 0;
     for (size_t i = 0; i < Size_(); ++i) {
         auto member = RandomMember_();
@@ -424,6 +445,7 @@ MemberTable MemberTable::GetSubset() const {
             }
         }
     }
+    */
 
     return subsetTable;
 }
@@ -473,35 +495,27 @@ void MemberTable::Insert_(const Member& member) {
 void MemberTable::InsertInLatest_(size_t index) {
     if (latestUpdates_.empty()) {
         latestUpdates_.push_back(index);
+        return;
     }
 
-    auto iter = latestUpdates_.begin();
-    for (; iter != latestUpdates_.end(); ++iter) {
-        if (set_[index].IsLatestUpdatedThen(set_[*iter])) {
-            break;
-        }
+    // Самая старая запись должна оказаться вверху
+    auto comp = [=](size_t lhs, size_t rhs) {
+        return !set_[lhs].IsLatestUpdatedThen(set_[rhs]);
+    };
+
+    if (latestUpdates_.size() < latestUpdatesSize_) { // Добавляем в конец, если не достигли макс. длины массива
+        latestUpdates_.push_back(index);
+    } else { // спускаем самый старый элемент и ставим на его место новый
+        std::pop_heap(latestUpdates_.begin(), latestUpdates_.end(), comp);
+        latestUpdates_.back() = index;
     }
 
-    if (iter != latestUpdates_.end()) {
-        latestUpdates_.insert(iter, index);
-
-        if (latestUpdates_.size() > latestUpdatesSize_) {
-            latestUpdates_.pop_back();
-        }
-    }
-}
-
-void MemberTable::DebugInsert(const Member& member) {
-    Insert_(member);
-}
-
-bool MemberTable::DebugIsExists(const Member& member) const {
-    return index_.find(member.Addr) != index_.end();
+    // Запихивает новый элемент на нужное место
+    std::push_heap(latestUpdates_.begin(), latestUpdates_.end(), comp);
 }
 
 
 const byte* Gossip::Read(const byte *bBegin, const byte* bEnd) {
-    size_t size = 0;
     if (!(bBegin = ReadNumberFromBytes(bBegin, bEnd, Type)))
         return nullptr;
     if (!(bBegin = Owner.Read(bBegin, bEnd)))
@@ -528,7 +542,6 @@ size_t Gossip::ByteSize() const {
     return sizeof(Type) +
            Owner.ByteSize() +
            Dest.ByteSize() +
-           sizeof(size_t) +
            Table.ByteSize();
 }
 

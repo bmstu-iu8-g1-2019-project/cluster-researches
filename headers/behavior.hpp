@@ -16,9 +16,9 @@
 #include <buffer.hpp>
 
 template < typename Type >
-class ThreadSaveGossipQueue {
+class ThreadSaveQueue { // rename
 private:
-    std::deque<Type> queue_;
+    std::deque<Type> queue_; // -> QUEUE
     mutable std::mutex mutex_;
 
 public:
@@ -41,22 +41,23 @@ public:
         std::lock_guard lock{mutex_};
 
         std::deque<Type> bucket{queue_};
-        queue_.clear();
+        queue_.clear();// move
 
         return bucket;
     }
 };
 
+// try to use 'typedef' or 'using'
 Variables SetupConfig(const std::string& configPath);
-boost::asio::ip::udp::socket SetupSocket(boost::asio::io_service& ioService, uint16_t port);
-void GossipsCatching(boost::asio::ip::udp::socket& sock, ThreadSaveGossipQueue<Gossip>& spread,
-                                                         ThreadSaveGossipQueue<Gossip>& fd);
-void FailureDetection(boost::asio::ip::udp::socket& sock, MemberTable& table, ThreadSaveGossipQueue<Gossip>& fdQueue,
-                                                                              ThreadSaveGossipQueue<Member>& conflictQueue);
+udpSocket SetupSocket(boost::asio::io_service& ioService, uint16_t port);
+void GossipsCatching(udpSocket& sock, ThreadSaveQueue<Gossip>& spread,
+                                                         ThreadSaveQueue<Gossip>& fd);
+void FailureDetection(udpSocket& sock, MemberTable& table, ThreadSaveQueue<Gossip>& fdQueue,
+                                                                              ThreadSaveQueue<Member>& conflictQueue);
 std::deque<Member> UpdateTable(MemberTable& table, const std::deque<Gossip>& queue);
 Gossip GenerateGossip(MemberTable& table, Gossip::GossipType type=Gossip::GossipType::Default);
-void SendGossip(boost::asio::ip::udp::socket&, const Gossip& gossip);
-void SpreadGossip(boost::asio::ip::udp::socket& sock, const MemberTable& table, std::deque<Member>& destQueue, Gossip& gossip, size_t destNum);
+void SendGossip(udpSocket&, const Gossip& gossip);
+void SpreadGossip(udpSocket& sock, const MemberTable& table, std::deque<Member>& destQueue, Gossip& gossip, size_t destNum);
 
 void AppConnector(const MemberTable& table, uint16_t port);
 
