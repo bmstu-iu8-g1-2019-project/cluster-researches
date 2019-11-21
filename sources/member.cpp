@@ -17,13 +17,13 @@ MemberAddr::MemberAddr(MemberAddr&& oth) noexcept
     oth._port = 0;
 }
 
-MemberAddr::MemberAddr(const gossip::MemberAddr& protoAddr)
+MemberAddr::MemberAddr(const Proto::MemberAddr& protoAddr)
   : _IP{ip_v4(protoAddr.ip())}
   , _port{static_cast<uint16_t>(protoAddr.port())}
 {}
 
-gossip::MemberAddr MemberAddr::ToProtoType() const {
-    gossip::MemberAddr protoAddr;
+Proto::MemberAddr MemberAddr::ToProtoType() const {
+    Proto::MemberAddr protoAddr;
 
     protoAddr.set_ip(_IP.to_uint());
     protoAddr.set_port(_port);
@@ -59,14 +59,6 @@ const port_t& MemberAddr::Port() const {
     return _port;
 }
 
-ip_v4& MemberAddr::IP() {
-    return const_cast<ip_v4&>(const_cast<const MemberAddr*>(this)->IP());
-}
-
-port_t& MemberAddr::Port() {
-    return const_cast<port_t&>(const_cast<const MemberAddr*>(this)->Port());
-}
-
 bool MemberAddr::operator==(const MemberAddr& rhs) const {
     return _IP == rhs._IP && _port == rhs._port;
 }
@@ -87,13 +79,13 @@ TimeStamp::TimeStamp(TimeStamp&& oth) noexcept
     oth._time_point = {};
 }
 
-TimeStamp::TimeStamp(const gossip::TimeStamp& timeStamp)
+TimeStamp::TimeStamp(const Proto::TimeStamp& timeStamp)
   : _time_point{milliseconds{timeStamp.time()}}
 {}
 
-gossip::TimeStamp TimeStamp::ToProtoType() const {
+Proto::TimeStamp TimeStamp::ToProtoType() const {
     using namespace std::chrono;
-    gossip::TimeStamp protoTimeStamp;
+    Proto::TimeStamp protoTimeStamp;
 
     protoTimeStamp.set_time(time_point_cast<milliseconds>(_time_point).time_since_epoch().count());
 
@@ -135,14 +127,6 @@ TimeStamp TimeStamp::Now() noexcept {
     return std::move(ts);
 }
 
-TimeStamp TimeStamp::Zero() noexcept {
-    using namespace std::chrono;
-    TimeStamp ts;
-    ts._time_point = time_point_cast<milliseconds>(system_clock::from_time_t(0));
-
-    return std::move(ts);
-}
-
 
 MemberInfo::MemberInfo()
   : _status{Alive}
@@ -159,15 +143,15 @@ MemberInfo::MemberInfo(MemberInfo&& oth) noexcept
     oth._incarnation = 0;
 }
 
-MemberInfo::MemberInfo(const gossip::MemberInfo& info) {
+MemberInfo::MemberInfo(const Proto::MemberInfo& info) {
     switch (info.status()) {
-        case gossip::MemberInfo::ALIVE :
+        case Proto::MemberInfo::ALIVE :
             _status = Alive;
             break;
-        case gossip::MemberInfo::SUSPICIOUS :
+        case Proto::MemberInfo::SUSPICIOUS :
             _status = Suspicious;
             break;
-        case gossip::MemberInfo::DEAD :
+        case Proto::MemberInfo::DEAD :
             _status = Dead;
             break;
     }
@@ -176,22 +160,22 @@ MemberInfo::MemberInfo(const gossip::MemberInfo& info) {
     _TS_updated = TimeStamp{info.time_stamp()};
 }
 
-gossip::MemberInfo MemberInfo::ToProtoType() const {
-    gossip::MemberInfo protoInfo;
+Proto::MemberInfo MemberInfo::ToProtoType() const {
+    Proto::MemberInfo protoInfo;
 
     switch (_status) {
         case Alive :
-            protoInfo.set_status(gossip::MemberInfo::ALIVE);
+            protoInfo.set_status(Proto::MemberInfo::ALIVE);
             break;
         case Suspicious :
-            protoInfo.set_status(gossip::MemberInfo::SUSPICIOUS);
+            protoInfo.set_status(Proto::MemberInfo::SUSPICIOUS);
             break;
         case Dead :
-            protoInfo.set_status(gossip::MemberInfo::DEAD);
+            protoInfo.set_status(Proto::MemberInfo::DEAD);
     }
 
     protoInfo.set_incarnation(_incarnation);
-    protoInfo.set_allocated_time_stamp(new gossip::TimeStamp{_TS_updated.ToProtoType()});
+    protoInfo.set_allocated_time_stamp(new Proto::TimeStamp{_TS_updated.ToProtoType()});
 
     return std::move(protoInfo);
 }
@@ -211,40 +195,28 @@ MemberInfo& MemberInfo::operator=(MemberInfo&& rhs) noexcept {
 
 void MemberInfo::IncreaseIncarnation() {
     ++_incarnation;
-    NewTimeStamp();
+    SetNewTimeStamp();
 }
 
-void MemberInfo::NewTimeStamp() {
+void MemberInfo::SetNewTimeStamp() {
     _TS_updated = TimeStamp::Now();
 }
 
-bool MemberInfo::IsStatusWorthThan(const MemberInfo& oth) const {
+bool MemberInfo::IsStatusBetterThan(const MemberInfo& oth) const {
     return _status > oth._status;
+}
+
+bool MemberInfo::IsIncarnationMoreThan(const MemberInfo& oth) const {
+    return _incarnation > oth._incarnation;
 }
 
 const MemberInfo::NodeState& MemberInfo::Status() const {
     return _status;
 }
 
-/*const incarnation_t& MemberInfo::Incarnation() const {
-    return _incarnation;
-}*/
-
 const TimeStamp& MemberInfo::LatestUpdate() const {
     return _TS_updated;
 }
-
-/*MemberInfo::NodeState& MemberInfo::Status() {
-    return const_cast<MemberInfo::NodeState&>(const_cast<const MemberInfo*>(this)->Status());
-}
-
-incarnation_t& MemberInfo::Incarnation() {
-    return const_cast<incarnation_t&>(const_cast<const MemberInfo*>(this)->Incarnation());
-}
-
-TimeStamp& MemberInfo::LatestUpdate() {
-    return const_cast<TimeStamp&>(const_cast<const MemberInfo*>(this)->LatestUpdate());
-}*/
 
 
 Member::Member(MemberAddr addr)
@@ -257,33 +229,28 @@ Member::Member(Member&& oth) noexcept
   , _info{std::move(oth._info)}
 {}
 
-Member::Member(const gossip::Member& member)
+Member::Member(const Proto::Member& member)
   : _addr{member.addr()}
   , _info{member.info()}
 {}
 
-gossip::Member Member::ToProtoType() const {
-    gossip::Member protoMember;
+Proto::Member Member::ToProtoType() const {
+    Proto::Member protoMember;
 
-    protoMember.set_allocated_addr(new gossip::MemberAddr{_addr.ToProtoType()});
-    protoMember.set_allocated_info(new gossip::MemberInfo{_info.ToProtoType()});
+    protoMember.set_allocated_addr(new Proto::MemberAddr{_addr.ToProtoType()});
+    protoMember.set_allocated_info(new Proto::MemberInfo{_info.ToProtoType()});
 
     return std::move(protoMember);
 }
 
-/*void Member::IncreaseIncarnation() {
-    _info.IncreaseIncarnation();
+const MemberAddr& Member::Addr() const {
+    return _addr;
 }
 
-void Member::NewTimeStamp() {
-    _info.NewTimeStamp();
+const MemberInfo& Member::Info() const {
+    return _info;
 }
 
-bool Member::IsStatusWorthThan(const Member& oth) const {
-    return _info.IsStatusWorthThan(oth._info);
+MemberInfo& Member::Info() {
+    return const_cast<MemberInfo&>(const_cast<const Member*>(this)->Info());
 }
-
-bool Member::IsSameNode(const Member& oth) const {
-    return _addr == oth._addr;*/
-}
-

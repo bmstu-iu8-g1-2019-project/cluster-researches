@@ -32,17 +32,14 @@ public:
     MemberAddr(const MemberAddr& oth);
     MemberAddr(MemberAddr&& oth) noexcept;
 
-    explicit MemberAddr(const gossip::MemberAddr& protoAddr);
-    gossip::MemberAddr ToProtoType() const;
+    explicit MemberAddr(const Proto::MemberAddr& protoAddr);
+    Proto::MemberAddr ToProtoType() const;
 
     MemberAddr& operator=(const MemberAddr& rhs);
     MemberAddr& operator=(MemberAddr&& rhs) noexcept;
 
     const ip_v4& IP() const;
     const port_t& Port() const;
-
-    ip_v4& IP();
-    port_t& Port();
 
     bool operator==(const MemberAddr& rhs) const;
 };
@@ -56,8 +53,8 @@ public:
     TimeStamp(const TimeStamp& oth) = default;
     TimeStamp(TimeStamp&& oth) noexcept;
 
-    explicit TimeStamp(const gossip::TimeStamp& timeStamp);
-    gossip::TimeStamp ToProtoType() const;
+    explicit TimeStamp(const Proto::TimeStamp& timeStamp);
+    Proto::TimeStamp ToProtoType() const;
 
     TimeStamp& operator=(const TimeStamp& rhs) = default;
     TimeStamp& operator=(TimeStamp&& rhs) noexcept;
@@ -69,7 +66,7 @@ public:
     milliseconds TimeDistance(const TimeStamp&& rhs) const;
 
     static TimeStamp Now() noexcept;
-    static TimeStamp Zero() noexcept;
+    // static TimeStamp Zero() noexcept;
 };
 
 class MemberInfo {
@@ -90,8 +87,8 @@ public:
     MemberInfo(const MemberInfo& oth) = default;
     MemberInfo(MemberInfo&& oth) noexcept;
 
-    explicit MemberInfo(const gossip::MemberInfo& info);
-    gossip::MemberInfo ToProtoType() const;
+    explicit MemberInfo(const Proto::MemberInfo& info);
+    Proto::MemberInfo ToProtoType() const;
 
     MemberInfo& operator=(const MemberInfo& rhs) = default;
     MemberInfo& operator=(MemberInfo&& rhs) noexcept;
@@ -100,9 +97,10 @@ public:
     const TimeStamp& LatestUpdate() const;
 
     void IncreaseIncarnation();
-    void NewTimeStamp();
+    void SetNewTimeStamp();
 
-    bool IsStatusWorthThan(const MemberInfo& oth) const;
+    bool IsStatusBetterThan(const MemberInfo& oth) const;
+    bool IsIncarnationMoreThan(const MemberInfo& oth) const;
 };
 
 class Member {
@@ -115,13 +113,12 @@ public:
     Member(const Member& oth) = default;
     Member(Member&& oth) noexcept;
 
-    explicit Member(const gossip::Member& member);
-    gossip::Member ToProtoType() const;
+    explicit Member(const Proto::Member& member);
+    Proto::Member ToProtoType() const;
 
     const MemberAddr& Addr() const;
     const MemberInfo& Info() const;
 
-    MemberAddr& Addr();
     MemberInfo& Info();
 };
 

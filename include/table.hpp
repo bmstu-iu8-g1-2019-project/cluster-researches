@@ -3,8 +3,12 @@
 #ifndef INCLUDE_TABLE_HPP_
 #define INCLUDE_TABLE_HPP_
 
+#include <numeric>
+#include <random>
+
 #include <boost/asio.hpp>
 
+#include <protobuf.pb.h>
 
 #include <member.hpp>
 
@@ -16,7 +20,6 @@ typedef uint8_t byte_t;
  * */
 class Table;
 
-
 /*
  * будет два типа слухов : push and pull
  * push -- те, которые мы отправляем. в них лежит адресат и адресант и
@@ -26,41 +29,18 @@ class Table;
  * pull -- те, которые мы принимаем. в них лежит адресат и адресант и
  *         PullTable (внутри лежит просто вектор членов)
  * */
+class PullTable;
+class PushTable;
 
-class PullTable {
-private:
-    std::vector<Member> _members;
-
-public:
-    explicit PullTable(const gossip::Table& table);
-    PullTable(PullTable&& oth) noexcept;
-
-    size_t Size() const;
-    const Member& operator[](size_t index) const;
-};
-
-class PushTable {
-private:
-    std::shared_ptr<Table> _pTable;
-    std::vector<size_t> _indexes;
-
-public:
-    PushTable(std::shared_ptr<Table> pTable, std::vector<size_t>&& indexes);
-    gossip::Table ToProtoType() const;
-};
 
 class Table {
 private:
-    //  TimeStamp::Zero() -- все хорошо, ничего не ожидаем
-    //  TimeStamp:: -- должны пропинговать, как только сможем
-    //
-    enum FDState {
-        OK = 0,
-        NeedPing = 1,
+    static std::mt19937 _rGenerator;
 
-    };
-private:
-    Member _me;
+    size_t _latestPartSize;
+    size_t _randomPartSize;
+
+    mutable Member _me;
 
     std::unordered_map<MemberAddr, size_t, MemberAddr::Hasher> _indexes;
     std::vector<Member> _members;
@@ -68,16 +48,49 @@ private:
     std::vector<size_t> _latestUpdates;
 
 public:
-    // void Insert(const Member& member);
-    void Update(PullTable&& table);
+    Table(const MemberAddr& addr, size_t latestPartSize, size_t randomPartSize);
 
-    // Size -- latest.size() + random.size()
-    PushTable MakePushTable() const;
+    // возвращает `Member` текущей ноды кластера
+    const Member& WhoAmI() const;
 
-    std::vector<size_t> MakeDestQ() const;
+    // если возник конфликт, то вернет `false`, иначе `true`
+    bool Update(const Member& member);
+
+    // возвращает список индексов на конфликтные члены
+    std::vector<size_t> Update(PullTable&& table);
+
+    PushTable MakePushTable() const; // Size -- latest.size() + random.size()
+
+    std::vector<size_t> MakeDestList() const;
 
     const Member& operator[](const MemberAddr& addr) const;
     const Member& operator[](size_t index) const;
+};
+
+
+class PullTable {
+private:
+    std::vector<Member> _members;
+
+public:
+    explicit PullTable(const Proto::Table& table);
+    PullTable(PullTable&& oth) noexcept;
+
+    size_t Size() const;
+    const Member& operator[](size_t index) const;
+};
+
+
+class PushTable {
+private:
+    std::shared_ptr<const Table> _pTable;
+    std::vector<size_t> _indexes;
+
+public:
+    PushTable(std::shared_ptr<const Table> pTable, std::vector<size_t>&& indexes);
+    Proto::Table ToProtoType() const;
+
+    const Member& WhoAmI() const;
 };
 
 #endif // INCLUDE_TABLE_HPP_

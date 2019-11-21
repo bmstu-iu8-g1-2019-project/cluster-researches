@@ -18,7 +18,6 @@ huntergate(
   SHA1 "70287b1ffa810ee4e952052a9adff9b4856d0d54"
 )
 
-
 project(gossip-daemon)
 
 
@@ -39,7 +38,8 @@ set(generated_files protobuf.pb.cc protobuf.pb.h)
 
 add_custom_command(
         OUTPUT ${generated_files}
-        COMMAND protobuf::protoc --cpp_out ${CMAKE_CURRENT_BINARY_DIR} -I ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/protobuf.proto
+        COMMAND protobuf::protoc --cpp_out ${CMAKE_CURRENT_BINARY_DIR}
+                                 -I ${CMAKE_CURRENT_SOURCE_DIR}/protobuf ${CMAKE_CURRENT_SOURCE_DIR}/protobuf/protobuf.proto
         COMMENT "Generating ${generated_files} from ${proto_file}"
         VERBATIM
 )
@@ -49,26 +49,40 @@ target_link_libraries(protobuf protobuf::libprotobuf)
 target_include_directories(protobuf PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/..)
 
 
-add_library(member STATIC
+add_library(types STATIC
   ${CMAKE_CURRENT_SOURCE_DIR}/sources/member.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/sources/table.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/sources/gossip.cpp
 )
-target_include_directories(member
-  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+add_library(behavior
+  ${CMAKE_CURRENT_SOURCE_DIR}/sources/behavior.cpp
+)
+add_executable(daemon
+  ${CMAKE_CURRENT_SOURCE_DIR}/sources/daemon.cpp
+)
+
+
+target_include_directories(types
   PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-target_link_libraries(member
+target_include_directories(behavior
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_include_directories(daemon
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+
+target_link_libraries(types
   PUBLIC Boost::system
   PUBLIC protobuf
 )
-
-add_library(table STATIC
-  ${CMAKE_CURRENT_SOURCE_DIR}/sources/table.cpp
+target_link_libraries(behavior
+  PUBLIC types
 )
-target_include_directories(table
-  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-target_link_libraries(table
-  PUBLIC member
+target_link_libraries(daemon
+  PUBLIC behavior
 )
 
 

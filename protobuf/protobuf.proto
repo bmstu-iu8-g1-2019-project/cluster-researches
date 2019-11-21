@@ -1,6 +1,6 @@
 syntax = "proto2";
 
-package gossip;
+package Proto;
 
 message MemberAddr {
   required uint32 IP = 1;
@@ -30,4 +30,11 @@ message Member {
 
 message Table {
   repeated Member table = 1;
+}
+
+message Gossip {
+  required Member owner = 1;
+  required Member dest = 2;
+
+  required Table table = 3;
 }
