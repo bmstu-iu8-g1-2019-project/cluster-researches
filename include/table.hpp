@@ -63,6 +63,8 @@ public:
 
     std::vector<size_t> MakeDestList() const;
 
+    size_t ToIndex(const MemberAddr& addr) const;
+
     const Member& operator[](const MemberAddr& addr) const;
     const Member& operator[](size_t index) const;
 };

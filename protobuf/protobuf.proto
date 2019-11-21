@@ -33,8 +33,15 @@ message Table {
 }
 
 message Gossip {
-  required Member owner = 1;
-  required Member dest = 2;
+  enum MessageType {
+    Ping = 0;
+    Ack = 1;
+  }
 
-  required Table table = 3;
+  required MessageType type = 1;
+
+  required Member owner = 2;
+  required Member dest = 3;
+
+  required Table table = 4;
 }

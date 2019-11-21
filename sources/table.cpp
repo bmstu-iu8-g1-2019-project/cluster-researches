@@ -134,6 +134,10 @@ std::vector<size_t> Table::MakeDestList() const {
     return std::move(destIndexes);
 }
 
+size_t Table::ToIndex(const MemberAddr& addr) const {
+    return _indexes.find(addr)->second;
+}
+
 const Member& Table::operator[](const MemberAddr& addr) const {
     return _members[_indexes.find(addr)->second];
 }
