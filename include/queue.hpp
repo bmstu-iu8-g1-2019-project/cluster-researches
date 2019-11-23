@@ -16,26 +16,26 @@ public:
     void Push(Type&& value) {
         std::lock_guard lock{_mutex};
 
-        _queue.push(value);
+        _queue.push(std::move(value));
     }
 
     Type Pop() {
         std::lock_guard lock{_mutex};
 
-        auto value = _queue.front();
+        auto value = std::move(_queue.front());
         _queue.pop();
 
         return std::move(value);
     }
 
-    std::queue<Type> Pop(size_t number) {
+    std::vector<Type> Pop(size_t number) {
         std::lock_guard lock{_mutex};
 
-        std::queue<Type> pops;
+        std::vector<Type> pops;
+        pops.reserve((number < _queue.size()) ? number : _queue.size());
 
-        size_t queueSize = _queue.size();
-        for (size_t i = 0; i < number && i < queueSize; ++i) {
-            pops.push(_queue.front());
+        for (size_t i = 0; i < number && !_queue.empty(); ++i) {
+            pops.push(std::move(_queue.front()));
             _queue.pop();
         }
 

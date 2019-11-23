@@ -19,7 +19,7 @@ message MemberInfo {
   }
 
   required State status = 1;
-  required uint32 incarnation = 2;
+  required int64 incarnation = 2;
   required TimeStamp time_stamp = 3;
 }
 

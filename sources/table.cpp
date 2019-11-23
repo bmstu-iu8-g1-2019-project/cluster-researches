@@ -4,6 +4,32 @@
 
 std::mt19937 Table::_rGenerator{42};
 
+Table::FDStatus::FDStatus()
+  : _isWaitForAck{false}
+  , _lastPing{TimeStamp::Now()}
+{}
+
+size_t Table::Size() const {
+    return _members.size();
+}
+
+void Table::FDStatus::SetAckWaiting() {
+    _isWaitForAck = true;
+    _lastPing = std::move(TimeStamp::Now());
+}
+
+void Table::FDStatus::ResetAckWaiting() {
+    _isWaitForAck = false;
+}
+
+milliseconds Table::FDStatus::AfterSetup() const {
+    return _lastPing.TimeDistance(TimeStamp::Now());
+}
+
+bool Table::FDStatus::IsWaitForAck() const {
+    return _isWaitForAck;
+}
+
 Table::Table(const MemberAddr& addr, size_t latestPartSize, size_t randomPartSize)
   : _me{addr}
   , _latestPartSize{latestPartSize}
@@ -30,7 +56,7 @@ bool Table::Update(const Member& member) {
 
     // если `member` -- неизвестный член кластера
     if (found == _indexes.end()) {
-        _indexes.insert(std::make_pair(member.Addr(), _members.size()));
+        _Insert(member);
         return true;
     }
 
@@ -65,15 +91,26 @@ std::vector<size_t> Table::Update(PullTable&& pullTable) {
 
     for (size_t i = 0; i < pullTable.Size(); ++i) {
         if (!Update(pullTable[i])) {
-            conflicts.push_back(_indexes.find(pullTable[i].Addr())->second);
+            conflicts.push_back(ToIndex(pullTable[i].Addr()));
         }
     }
 
     return std::move(conflicts);
 }
 
+void Table::SetAckWaiting(size_t index) {
+    _fd[index].SetAckWaiting();
+}
+
+void Table::ResetAckWaiting(size_t index) {
+    _fd[index].ResetAckWaiting();
+}
+
 PushTable Table::MakePushTable() const {
     std::vector<size_t> indexes;
+    indexes.reserve((_latestUpdates.size() + _randomPartSize < _members.size()) ?
+                    _latestUpdates.size() + _randomPartSize :
+                    _members.size());
 
     for (const auto& latest : _latestUpdates) {
         indexes.push_back(latest);
@@ -95,7 +132,7 @@ PushTable Table::MakePushTable() const {
 
     return std::move(pushTable);
 
-    // Самый быстрый алгоритм, но очень дорогой по памяти
+    // Самый быстрый алгоритм, что я придумал, но очень дорогой по памяти
     /*std::vector<size_t> indexes;
 
     for (const auto& latest : _latestUpdates) {
@@ -144,6 +181,12 @@ const Member& Table::operator[](const MemberAddr& addr) const {
 
 const Member& Table::operator[](size_t index) const {
     return _members[index];
+}
+
+void Table::_Insert(const Member& member) {
+    _indexes.insert(std::make_pair(member.Addr(), _members.size()));
+    _members.push_back(member);
+    _fd.emplace_back(FDStatus{});
 }
 
 

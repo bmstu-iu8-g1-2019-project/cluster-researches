@@ -70,32 +70,32 @@ size_t MemberAddr::Hasher::operator()(const MemberAddr& key) const {
 
 
 TimeStamp::TimeStamp()
-  : _time_point{}
+  : _time{std::chrono::duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count()}
 {}
 
 TimeStamp::TimeStamp(TimeStamp&& oth) noexcept
-  : _time_point{oth._time_point}
+  : _time{oth._time}
 {
-    oth._time_point = {};
+    oth._time = 0;
 }
 
 TimeStamp::TimeStamp(const Proto::TimeStamp& timeStamp)
-  : _time_point{milliseconds{timeStamp.time()}}
+  : _time{timeStamp.time()}
 {}
 
 Proto::TimeStamp TimeStamp::ToProtoType() const {
     using namespace std::chrono;
-    Proto::TimeStamp protoTimeStamp;
 
-    protoTimeStamp.set_time(time_point_cast<milliseconds>(_time_point).time_since_epoch().count());
+    Proto::TimeStamp protoTimeStamp;
+    protoTimeStamp.set_time(_time);
 
     return std::move(protoTimeStamp);
 }
 
 TimeStamp& TimeStamp::operator=(TimeStamp&& rhs) noexcept {
     if (this != &rhs) {
-        _time_point = rhs._time_point;
-        rhs._time_point = {};
+        _time = rhs._time;
+        rhs._time = {};
     }
 
     return *this;
@@ -106,7 +106,7 @@ bool TimeStamp::OlderThan(const TimeStamp& rhs) const {
 }
 
 bool TimeStamp::OlderThan(const TimeStamp&& rhs) const {
-    return _time_point <= rhs._time_point;
+    return _time <= rhs._time;
 }
 
 milliseconds TimeStamp::TimeDistance(const TimeStamp& rhs) const {
@@ -114,17 +114,11 @@ milliseconds TimeStamp::TimeDistance(const TimeStamp& rhs) const {
 }
 
 milliseconds TimeStamp::TimeDistance(const TimeStamp&& rhs) const {
-    return (_time_point > rhs._time_point) ?
-           milliseconds{std::chrono::duration_cast<milliseconds>(_time_point - rhs._time_point)} :
-           milliseconds{std::chrono::duration_cast<milliseconds>(rhs._time_point - _time_point)};
+    return milliseconds{std::abs(_time - rhs._time)};
 }
 
 TimeStamp TimeStamp::Now() noexcept {
-    using namespace std::chrono;
-    TimeStamp ts;
-    ts._time_point = time_point_cast<milliseconds>(system_clock::now());
-
-    return std::move(ts);
+    return std::move(TimeStamp{});
 }
 
 

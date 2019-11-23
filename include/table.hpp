@@ -35,6 +35,22 @@ class PushTable;
 
 class Table {
 private:
+    class FDStatus {
+    private:
+        bool _isWaitForAck;
+        TimeStamp _lastPing;
+
+    public:
+        FDStatus();
+        void SetAckWaiting();
+        void ResetAckWaiting();
+
+        milliseconds AfterSetup() const;
+
+        bool IsWaitForAck() const;
+    };
+
+private:
     static std::mt19937 _rGenerator;
 
     size_t _latestPartSize;
@@ -45,28 +61,36 @@ private:
     std::unordered_map<MemberAddr, size_t, MemberAddr::Hasher> _indexes;
     std::vector<Member> _members;
 
+    std::vector<FDStatus> _fd;
+
     std::vector<size_t> _latestUpdates;
 
 public:
     Table(const MemberAddr& addr, size_t latestPartSize, size_t randomPartSize);
+
+    size_t Size() const;
 
     // возвращает `Member` текущей ноды кластера
     const Member& WhoAmI() const;
 
     // если возник конфликт, то вернет `false`, иначе `true`
     bool Update(const Member& member);
-
     // возвращает список индексов на конфликтные члены
     std::vector<size_t> Update(PullTable&& table);
+
+    void SetAckWaiting(size_t index);
+    void ResetAckWaiting(size_t index);
 
     PushTable MakePushTable() const; // Size -- latest.size() + random.size()
 
     std::vector<size_t> MakeDestList() const;
 
     size_t ToIndex(const MemberAddr& addr) const;
-
     const Member& operator[](const MemberAddr& addr) const;
     const Member& operator[](size_t index) const;
+
+private:
+    void _Insert(const Member& member);
 };
 
 

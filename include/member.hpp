@@ -13,7 +13,6 @@ typedef boost::asio::ip::address_v4 ip_v4;
 typedef uint16_t port_t;
 typedef size_t incarnation_t;
 typedef std::chrono::milliseconds milliseconds;
-typedef std::chrono::time_point<std::chrono::system_clock> time_point;
 
 class MemberAddr {
 public:
@@ -45,8 +44,10 @@ public:
 };
 
 class TimeStamp {
+    typedef std::chrono::system_clock system_clock;
+
 private:
-    time_point _time_point;
+    int64_t _time;
 
 public:
     TimeStamp();

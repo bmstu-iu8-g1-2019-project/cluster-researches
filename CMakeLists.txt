@@ -83,6 +83,7 @@ target_link_libraries(behavior
 )
 target_link_libraries(daemon
   PUBLIC behavior
+        -pthread
 )
 
 

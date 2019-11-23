@@ -37,7 +37,7 @@ PushGossip::PushGossip(PushTable&& table)
   : _table{table}
 {}
 
-Proto::Gossip PushGossip::ToProtoType(const Member& dest, MessageType type) const {
+Proto::Gossip PushGossip::ToProtoType(MessageType type) const {
     Proto::Gossip protoGossip;
 
     switch (type) {
@@ -50,8 +50,12 @@ Proto::Gossip PushGossip::ToProtoType(const Member& dest, MessageType type) cons
     }
 
     protoGossip.set_allocated_owner(new Proto::Member{_table.WhoAmI().ToProtoType()});
-    protoGossip.set_allocated_dest(new Proto::Member{dest.ToProtoType()});
     protoGossip.set_allocated_table(new Proto::Table{_table.ToProtoType()});
 
+    return std::move(protoGossip);
+}
+
+Proto::Gossip MakeProtoGossip(PushTable&& table, MessageType type) {
+    Proto::Gossip protoGossip = PushGossip{std::move(table)}.ToProtoType(type);
     return std::move(protoGossip);
 }

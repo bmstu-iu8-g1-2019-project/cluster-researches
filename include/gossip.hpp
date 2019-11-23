@@ -41,7 +41,9 @@ private:
 public:
     explicit PushGossip(PushTable&& table);
 
-    Proto::Gossip ToProtoType(const Member& dest, MessageType type) const;
+    Proto::Gossip ToProtoType(MessageType type) const;
 };
+
+Proto::Gossip MakeProtoGossip(PushTable&& table, MessageType type);
 
 #endif // INCLUDE_GOSSIP_HPP_
