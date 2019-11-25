@@ -2,29 +2,118 @@
 
 #include <behavior.hpp>
 
+Config::Config(const std::string& path) {
+    std::ifstream file{path};
+
+    if (!file.is_open()) {
+        return;
+    }
+
+    auto json = nlohmann::json::parse(file);
+
+    _ip = ip_v4::from_string(json["address"]["ip"]);
+    _port = json["address"]["port"];
+
+    _bufferSize = json["buffer-size"];
+
+    _latestPartSize = json["latest-part-size"];
+    _randomPartSize = json["random-part-size"];
+
+    _pingProcNum = json["ping-processing-num"];
+    _ackProcNum = json["ack-processing-num"];
+
+    _spreadDestsNum = json["spread-destination-num"];
+    _spreadRepetition = milliseconds{json["spread-repetition"]};
+
+    _fdTimeout = milliseconds{json["fd-timeout"]};
+    _fdRepetition = milliseconds{json["fd-repetition"]};
+    _fdFailuresBeforeDead = json["fd-failures-before-dead"];
+
+
+    _pTable = std::make_unique<Table>(MemberAddr{_ip, _port}, _latestPartSize, _randomPartSize);
+    for (const auto& jsonMember : json["table"]) {
+        auto member = Member{MemberAddr::FromJSON(jsonMember["address"])};
+        _pTable->Update(member);
+    }
+}
+
+const ip_v4& Config::IP() const {
+    return _ip;
+}
+
+uint16_t Config::Port() const {
+    return _port;
+}
+
+size_t Config::BufferSize() const {
+    return _bufferSize;
+}
+
+size_t Config::LatestPartSize() const {
+    return _latestPartSize;
+}
+
+size_t Config::RandomPartSize() const {
+    return _randomPartSize;
+}
+
+size_t Config::PingProcessingNum() const {
+    return _pingProcNum;
+}
+
+size_t Config::AckProcessingNum() const {
+    return _ackProcNum;
+}
+
+size_t Config::SpreadDestinationNum() const {
+    return _spreadDestsNum;
+}
+
+milliseconds Config::SpreadRepetition() const {
+    return _spreadRepetition;
+}
+
+milliseconds Config::FDTimout() const {
+    return _fdTimeout;
+}
+
+milliseconds Config::FDRepetition() const {
+    return _fdRepetition;
+}
+
+size_t Config::FailuresBeforeDead() const {
+    return _fdFailuresBeforeDead;
+}
+
+Table&& Config::MoveTable() {
+    return std::move(*_pTable);
+}
+
+
 Socket::Socket(io_service& ioService, uint16_t port, size_t bufferSize)
   : _socket{ioService, endpoint{ip_v4{}, port}}
-  , _buffer(bufferSize, 0)
+  , _IBuffer(bufferSize, 0)
+  , _OBuffer(bufferSize, 0)
 {}
 
 void Socket::_SendProtoGossip(const Proto::Gossip& protoGossip) {
     endpoint destEndPoint{ip_v4{protoGossip.dest().addr().ip()},
                           static_cast<uint16_t>(protoGossip.dest().addr().port())};
 
-    if (!protoGossip.SerializeToArray(_buffer.data(), _buffer.size())) {
+    if (!protoGossip.SerializeToArray(_OBuffer.data(), _OBuffer.size())) {
         std::cout << "Proto::Gossip send failure" << std::endl;
         return;
     }
 
-    _socket.send_to(boost::asio::buffer(_buffer.data(), protoGossip.ByteSize()), destEndPoint);
+    _socket.send_to(boost::asio::buffer(_OBuffer.data(), protoGossip.ByteSize()), destEndPoint);
 }
 
 void Socket::_GossipCatching(ThreadSaveQueue<PullGossip>& pings, ThreadSaveQueue<PullGossip>& acks) {
     while (true) {
-        size_t receivedBytes = _socket.receive(boost::asio::buffer(_buffer));
+        size_t receivedBytes = _socket.receive(boost::asio::buffer(_IBuffer));
 
         Proto::Gossip protoGossip;
-        if (!protoGossip.ParseFromArray(_buffer.data(), receivedBytes)) {
+        if (!protoGossip.ParseFromArray(_IBuffer.data(), receivedBytes)) {
             continue;
         }
 
@@ -33,10 +122,16 @@ void Socket::_GossipCatching(ThreadSaveQueue<PullGossip>& pings, ThreadSaveQueue
 
         switch (gossip.Type()) {
             case MessageType::Ping :
+                std::cout << "[PULL]:[PING]: " << gossip.Owner().ToJSON().dump() << std::endl;
+
                 pings.Push(std::move(gossip));
+
                 break;
             case MessageType::Ack :
+                std::cout << "[PULL]:[ACK ]: " << gossip.Owner().ToJSON().dump() << std::endl;
+
                 acks.Push(std::move(gossip));
+
                 break;
         }
     }
@@ -56,12 +151,14 @@ void Socket::SendAcks(const Table& table, std::vector<size_t>&& destIndexes) {
         _SendProtoGossip(protoGossip);
 
         protoGossip.clear_dest();
+
+        std::cout << "[PUSH]:[ACK ]: " << table[index].ToJSON().dump() << std::endl;
     }
 
     destIndexes.clear();
 }
 
-void Socket::Spread(Table &table, size_t destsNum) {
+void Socket::Spread(Table& table, size_t destsNum) {
     static auto destQueue = table.MakeDestList();
 
     auto protoGossip = MakeProtoGossip(table.MakePushTable(), MessageType::Ping);
@@ -73,6 +170,8 @@ void Socket::Spread(Table &table, size_t destsNum) {
 
         size_t destIndex = destQueue.back();
         destQueue.pop_back();
+
+        std::cout << "[PUSH]:[PING]: " << table[destIndex].ToJSON().dump() << std::endl;
 
         SetDest(protoGossip, table[destIndex]);
 
@@ -124,13 +223,4 @@ void AcceptAcks(Table& table, std::vector<PullGossip>&& acks) {
     }
 
     acks.clear();
-}
-
-void SendProtoGossip(socket_type& socket, const Proto::Gossip& protoGossip) {
-    std::vector<byte_t> buffer;
-    buffer.resize(protoGossip.ByteSize());
-
-    endpoint destEndPoint{ip_v4{protoGossip.dest().addr().ip()},
-                          static_cast<uint16_t>(protoGossip.dest().addr().port())};
-    socket.send_to(boost::asio::buffer(buffer), destEndPoint);
 }

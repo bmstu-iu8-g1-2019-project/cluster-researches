@@ -5,24 +5,21 @@
 #include <behavior.hpp>
 #include <queue.hpp>
 
+int main(int argc, char** argv) {
+    Config conf{argv[1]};
 
-
-int main() {
     io_service ioService;
-    // TODO(AndreevSemen) : change it for env var
-    Socket socket(ioService, 8000, 1500);
+    Socket socket(ioService, conf.Port(), conf.BufferSize());
 
     ThreadSaveQueue<PullGossip> pingQ;
     ThreadSaveQueue<PullGossip> ackQ;
     socket.RunGossipCatching(pingQ, ackQ);
 
-    // TODO(AndreevSemen) : change it for env var
-    Table table{MemberAddr{ip_v4::from_string("127.0.0.1"), 8000}, 5, 5};
+    Table table{conf.MoveTable()};
     while (true) {
         /// Updating table with ping-pulls and sending push-acks
         {
-            // TODO(AndreevSemen) : change it for env var
-            auto pings = pingQ.Pop(10);
+            auto pings = pingQ.Pop(conf.PingProcessingNum());
 
             auto conflicts = UpdateTable(table, pings);
             auto ackWaiters = GetIndexesToGossipOwners(table, pings);
@@ -31,28 +28,24 @@ int main() {
 
         /// Reacting to ack-pulls
         {
-            // TODO(AndreevSemen) : change it for env var
-            auto acks = ackQ.Pop(10);
+            auto acks = ackQ.Pop(conf.AckProcessingNum());
             AcceptAcks(table, std::move(acks));
         }
 
         /// Spreading ping-pushes
         static TimeStamp lastSpread{TimeStamp::Now()};
 
-        // TODO(AndreevSemen) : change it for env var
-        // 5 seconds
-        if (lastSpread.TimeDistance(TimeStamp::Now()) > milliseconds{5000}) {
-            // TODO(AndreevSemen) : change it for env var
-            socket.Spread(table, 10);
+        if (lastSpread.TimeDistance(TimeStamp::Now()) > conf.SpreadRepetition()) {
+            socket.Spread(table, conf.SpreadDestinationNum());
+            lastSpread = TimeStamp::Now();
         }
 
         // Detecting failures
         static TimeStamp lastTimeoutCheck{TimeStamp::Now()};
 
-        // TODO(AndreevSemen) : change it for env var
-        // 5 seconds
-        if (lastTimeoutCheck.TimeDistance(TimeStamp::Now()) > milliseconds{5000}) {
-            DetectFailures(table, msTimeout, failuresBeforeDead);
+        if (lastTimeoutCheck.TimeDistance(TimeStamp::Now()) > conf.FDRepetition()) {
+            table.DetectFailures(conf.FDTimout(), conf.FailuresBeforeDead());
+            lastTimeoutCheck = TimeStamp::Now();
         }
     }
 }

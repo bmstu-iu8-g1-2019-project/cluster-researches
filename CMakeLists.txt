@@ -77,9 +77,11 @@ target_include_directories(daemon
 target_link_libraries(types
   PUBLIC Boost::system
   PUBLIC protobuf
+  PUBLIC nlohmann_json::nlohmann_json
 )
 target_link_libraries(behavior
   PUBLIC types
+  PUBLIC nlohmann_json::nlohmann_json
 )
 target_link_libraries(daemon
   PUBLIC behavior

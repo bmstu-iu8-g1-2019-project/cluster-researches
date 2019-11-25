@@ -1,0 +1,36 @@
+{
+  "address" : {
+    "ip" : "127.0.0.1",
+    "port" : 8011
+  },
+
+  "buffer-size" : 1500,
+
+  "latest-part-size" : 5,
+  "random-part-size" : 5,
+
+  "ping-processing-num" : 10,
+  "ack-processing-num" : 10,
+
+  "spread-destination-num" : 4,
+  "spread-repetition" : 1000,
+
+  "fd-timeout" : 800,
+  "fd-repetition" : 100,
+  "fd-failures-before-dead" : 2,
+
+  "table" : [
+    {
+      "address": {
+        "ip": "127.0.0.1",
+        "port": 8000
+      }
+    },
+    {
+      "address" : {
+        "ip" : "127.0.0.1",
+        "port" : 8001
+      }
+    }
+  ]
+}

@@ -34,7 +34,7 @@ PullTable&& PullGossip::MoveTable() {
 
 
 PushGossip::PushGossip(PushTable&& table)
-  : _table{table}
+  : _table{std::move(table)}
 {}
 
 Proto::Gossip PushGossip::ToProtoType(MessageType type) const {

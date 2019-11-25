@@ -5,6 +5,7 @@
 
 #include <chrono>
 
+#include <nlohmann/json.hpp>
 #include <boost/asio.hpp>
 
 #include <protobuf.pb.h>
@@ -34,6 +35,9 @@ public:
     explicit MemberAddr(const Proto::MemberAddr& protoAddr);
     Proto::MemberAddr ToProtoType() const;
 
+    static MemberAddr FromJSON(const nlohmann::json& json);
+    nlohmann::json ToJSON() const;
+
     MemberAddr& operator=(const MemberAddr& rhs);
     MemberAddr& operator=(MemberAddr&& rhs) noexcept;
 
@@ -51,11 +55,14 @@ private:
 
 public:
     TimeStamp();
+    TimeStamp(milliseconds ms);
     TimeStamp(const TimeStamp& oth) = default;
     TimeStamp(TimeStamp&& oth) noexcept;
 
     explicit TimeStamp(const Proto::TimeStamp& timeStamp);
     Proto::TimeStamp ToProtoType() const;
+
+    milliseconds Time() const;
 
     TimeStamp& operator=(const TimeStamp& rhs) = default;
     TimeStamp& operator=(TimeStamp&& rhs) noexcept;
@@ -91,11 +98,16 @@ public:
     explicit MemberInfo(const Proto::MemberInfo& info);
     Proto::MemberInfo ToProtoType() const;
 
+    static MemberInfo FromJSON(const nlohmann::json& json);
+    nlohmann::json ToJSON() const;
+
     MemberInfo& operator=(const MemberInfo& rhs) = default;
     MemberInfo& operator=(MemberInfo&& rhs) noexcept;
 
     const NodeState& Status() const;
     const TimeStamp& LatestUpdate() const;
+
+    NodeState& Status();
 
     void IncreaseIncarnation();
     void SetNewTimeStamp();
@@ -116,6 +128,9 @@ public:
 
     explicit Member(const Proto::Member& member);
     Proto::Member ToProtoType() const;
+
+    static Member FromJSON(const nlohmann::json& json);
+    nlohmann::json ToJSON() const;
 
     const MemberAddr& Addr() const;
     const MemberInfo& Info() const;

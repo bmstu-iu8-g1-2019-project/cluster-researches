@@ -7,6 +7,7 @@ std::mt19937 Table::_rGenerator{42};
 Table::FDStatus::FDStatus()
   : _isWaitForAck{false}
   , _lastPing{TimeStamp::Now()}
+  , _failures{0}
 {}
 
 size_t Table::Size() const {
@@ -15,15 +16,30 @@ size_t Table::Size() const {
 
 void Table::FDStatus::SetAckWaiting() {
     _isWaitForAck = true;
-    _lastPing = std::move(TimeStamp::Now());
+    _lastPing = TimeStamp::Now();
 }
 
 void Table::FDStatus::ResetAckWaiting() {
     _isWaitForAck = false;
+    _failures = 0;
 }
 
-milliseconds Table::FDStatus::AfterSetup() const {
-    return _lastPing.TimeDistance(TimeStamp::Now());
+MemberInfo::NodeState Table::FDStatus::DetectFailure(milliseconds timeout, size_t failuresBeforeDead) {
+    if (IsWaitForAck() && _lastPing.TimeDistance(TimeStamp::Now()) > timeout) {
+        ++_failures;
+        _isWaitForAck = false;
+
+        std::cout << "[ FD ]: ";
+        if (_failures >= failuresBeforeDead) {
+            std::cout << "DEAD Detected" << std::endl;
+            return MemberInfo::Dead;
+        } else {
+            std::cout << "SUSPICIOUS Detected" << std::endl;
+            return MemberInfo::Suspicious;
+        }
+    }
+
+    return MemberInfo::Alive;
 }
 
 bool Table::FDStatus::IsWaitForAck() const {
@@ -36,6 +52,16 @@ Table::Table(const MemberAddr& addr, size_t latestPartSize, size_t randomPartSiz
   , _randomPartSize{randomPartSize}
 {}
 
+Table::Table(Table&& oth) noexcept
+  : _latestPartSize{oth._latestPartSize}
+  , _randomPartSize{oth._randomPartSize}
+  , _me{std::move(oth._me)}
+  , _indexes{std::move(oth._indexes)}
+  , _members{std::move(oth._members)}
+  , _fd{std::move(oth._fd)}
+  , _latestUpdates{std::move(oth._latestUpdates)}
+{}
+
 const Member& Table::WhoAmI() const {
     _me.Info().SetNewTimeStamp();
 
@@ -44,7 +70,7 @@ const Member& Table::WhoAmI() const {
 
 bool Table::Update(const Member& member) {
     // если узнали, что кто-то думает, что мы мертвы, то необходимо увеличить инкарнацию
-    if (member.Addr() == _me.Addr()) {
+    if (member.Addr() == WhoAmI().Addr()) {
         if (member.Info().Status() == MemberInfo::Suspicious ||
             member.Info().Status() == MemberInfo::Dead) {
             _me.Info().IncreaseIncarnation();
@@ -57,6 +83,8 @@ bool Table::Update(const Member& member) {
     // если `member` -- неизвестный член кластера
     if (found == _indexes.end()) {
         _Insert(member);
+        _InsertInLatest(ToIndex(member.Addr()));
+
         return true;
     }
 
@@ -67,6 +95,8 @@ bool Table::Update(const Member& member) {
     // если у `member` новая инкарнация
     if (member.Info(). IsIncarnationMoreThan (knownMember.Info())) {
         knownMember.Info() = member.Info();
+        _InsertInLatest(ToIndex(member.Addr()));
+
         return true;
     }
 
@@ -83,6 +113,8 @@ bool Table::Update(const Member& member) {
 
     // все остальные случаи являются валидными, ими нужно обновить таблицу
     knownMember.Info() = member.Info();
+    _InsertInLatest(ToIndex(member.Addr()));
+
     return true;
 }
 
@@ -106,6 +138,21 @@ void Table::ResetAckWaiting(size_t index) {
     _fd[index].ResetAckWaiting();
 }
 
+void Table::DetectFailures(milliseconds msTimeout, size_t failuresBeforeDead) {
+    for (size_t index = 0; index < _members.size(); ++index) {
+        switch (_fd[index].DetectFailure(msTimeout, failuresBeforeDead)) {
+            case MemberInfo::Alive :
+                break;
+            case MemberInfo::Suspicious :
+                _members[index].Info().Status() = MemberInfo::Suspicious;
+                break;
+            case MemberInfo::Dead :
+                _members[index].Info().Status() = MemberInfo::Dead;
+                break;
+        }
+    }
+}
+
 PushTable Table::MakePushTable() const {
     std::vector<size_t> indexes;
     indexes.reserve((_latestUpdates.size() + _randomPartSize < _members.size()) ?
@@ -118,7 +165,7 @@ PushTable Table::MakePushTable() const {
 
     for (size_t i = 0; i < _randomPartSize &&
                        i + _latestUpdates.size() < _members.size();) {
-        size_t randomIndex = _rGenerator();
+        size_t randomIndex = _rGenerator() % _members.size();
 
         if (std::find(indexes.begin(), indexes.end(), randomIndex) == indexes.end()) {
             indexes.push_back(randomIndex);
@@ -164,6 +211,7 @@ PushTable Table::MakePushTable() const {
 
 std::vector<size_t> Table::MakeDestList() const {
     std::vector<size_t> destIndexes;
+    destIndexes.resize(_members.size());
 
     std::iota(destIndexes.begin(), destIndexes.end(), 0);
     std::shuffle(destIndexes.begin(), destIndexes.end(), _rGenerator);
@@ -187,6 +235,21 @@ void Table::_Insert(const Member& member) {
     _indexes.insert(std::make_pair(member.Addr(), _members.size()));
     _members.push_back(member);
     _fd.emplace_back(FDStatus{});
+}
+
+void Table::_InsertInLatest(size_t index) {
+    auto bound = std::find_if(_latestUpdates.begin(), _latestUpdates.end(),
+            [&](size_t latest) {
+                return _members[latest].Info().LatestUpdate().
+                       OlderThan(
+                       _members[index].Info().LatestUpdate());
+            });
+
+    _latestUpdates.insert(bound, index);
+
+    if (_latestUpdates.size() > _latestPartSize) {
+        _latestUpdates.pop_back();
+    }
 }
 
 

@@ -40,12 +40,14 @@ private:
         bool _isWaitForAck;
         TimeStamp _lastPing;
 
+        uint32_t _failures;
+
     public:
         FDStatus();
         void SetAckWaiting();
         void ResetAckWaiting();
 
-        milliseconds AfterSetup() const;
+        MemberInfo::NodeState DetectFailure(milliseconds timeout, size_t failuresBeforeDead);
 
         bool IsWaitForAck() const;
     };
@@ -67,6 +69,7 @@ private:
 
 public:
     Table(const MemberAddr& addr, size_t latestPartSize, size_t randomPartSize);
+    Table(Table&& oth) noexcept;
 
     size_t Size() const;
 
@@ -81,6 +84,8 @@ public:
     void SetAckWaiting(size_t index);
     void ResetAckWaiting(size_t index);
 
+    void DetectFailures(milliseconds msTimeout, size_t failuresBeforeDead);
+
     PushTable MakePushTable() const; // Size -- latest.size() + random.size()
 
     std::vector<size_t> MakeDestList() const;
@@ -91,6 +96,7 @@ public:
 
 private:
     void _Insert(const Member& member);
+    void _InsertInLatest(size_t index);
 };
 
 

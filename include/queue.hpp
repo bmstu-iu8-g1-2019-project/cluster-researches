@@ -19,15 +19,6 @@ public:
         _queue.push(std::move(value));
     }
 
-    Type Pop() {
-        std::lock_guard lock{_mutex};
-
-        auto value = std::move(_queue.front());
-        _queue.pop();
-
-        return std::move(value);
-    }
-
     std::vector<Type> Pop(size_t number) {
         std::lock_guard lock{_mutex};
 
@@ -35,7 +26,7 @@ public:
         pops.reserve((number < _queue.size()) ? number : _queue.size());
 
         for (size_t i = 0; i < number && !_queue.empty(); ++i) {
-            pops.push(std::move(_queue.front()));
+            pops.emplace_back(std::move(_queue.front()));
             _queue.pop();
         }
 
