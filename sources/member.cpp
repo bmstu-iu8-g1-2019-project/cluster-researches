@@ -33,12 +33,14 @@ Proto::MemberAddr MemberAddr::ToProtoType() const {
 }
 
 MemberAddr MemberAddr::FromJSON(const nlohmann::json& json) {
-    return std::move(MemberAddr{ip_v4::from_string(json["ip"]),
-                                json["port"]});
+    auto ip = ip_v4::from_string(json["ip"]);
+    uint16_t port = json["port"];
+
+    return std::move(MemberAddr{ip, port});
 }
 
 nlohmann::json MemberAddr::ToJSON() const {
-    nlohmann::json json = nlohmann::json::object();
+    auto json = nlohmann::json::object();
 
     json["ip"] = _IP.to_string();
     json["port"] = _port;
@@ -85,7 +87,9 @@ size_t MemberAddr::Hasher::operator()(const MemberAddr& key) const {
 
 
 TimeStamp::TimeStamp()
-  : _time{std::chrono::duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count()}
+  : _time{std::chrono::duration_cast<milliseconds>(
+              system_clock::now().time_since_epoch()
+          ).count()}
 {}
 
 TimeStamp::TimeStamp(milliseconds ms)
@@ -103,8 +107,6 @@ TimeStamp::TimeStamp(const Proto::TimeStamp& timeStamp)
 {}
 
 Proto::TimeStamp TimeStamp::ToProtoType() const {
-    using namespace std::chrono;
-
     Proto::TimeStamp protoTimeStamp;
     protoTimeStamp.set_time(_time);
 
@@ -118,7 +120,8 @@ milliseconds TimeStamp::Time() const {
 TimeStamp& TimeStamp::operator=(TimeStamp&& rhs) noexcept {
     if (this != &rhs) {
         _time = rhs._time;
-        rhs._time = {};
+
+        rhs._time = 0;
     }
 
     return *this;
@@ -130,10 +133,6 @@ bool TimeStamp::OlderThan(const TimeStamp& rhs) const {
 
 bool TimeStamp::OlderThan(const TimeStamp&& rhs) const {
     return _time <= rhs._time;
-}
-
-milliseconds TimeStamp::TimeDistance(const TimeStamp& rhs) const {
-    return this->TimeDistance(const_cast<const TimeStamp&&>(rhs));
 }
 
 milliseconds TimeStamp::TimeDistance(const TimeStamp&& rhs) const {
@@ -160,37 +159,41 @@ MemberInfo::MemberInfo(MemberInfo&& oth) noexcept
     oth._incarnation = 0;
 }
 
-MemberInfo::MemberInfo(const Proto::MemberInfo& info) {
+MemberInfo::MemberInfo(const Proto::MemberInfo& info)
+  : _incarnation{info.incarnation()}
+  , _TS_updated{info.time_stamp()}
+{
+    NodeState status = Alive;
     switch (info.status()) {
         case Proto::MemberInfo::ALIVE :
-            _status = Alive;
+            status = Alive;
             break;
         case Proto::MemberInfo::SUSPICIOUS :
-            _status = Suspicious;
+            status = Suspicious;
             break;
         case Proto::MemberInfo::DEAD :
-            _status = Dead;
+            status = Dead;
             break;
     }
-
-    _incarnation = info.incarnation();
-    _TS_updated = TimeStamp{info.time_stamp()};
+    _status = status;
 }
 
 Proto::MemberInfo MemberInfo::ToProtoType() const {
     Proto::MemberInfo protoInfo;
 
+    Proto::MemberInfo::State status = Proto::MemberInfo::ALIVE;
     switch (_status) {
         case Alive :
-            protoInfo.set_status(Proto::MemberInfo::ALIVE);
+            status = Proto::MemberInfo::ALIVE;
             break;
         case Suspicious :
-            protoInfo.set_status(Proto::MemberInfo::SUSPICIOUS);
+            status = Proto::MemberInfo::SUSPICIOUS;
             break;
         case Dead :
-            protoInfo.set_status(Proto::MemberInfo::DEAD);
+            status = Proto::MemberInfo::DEAD;
             break;
     }
+    protoInfo.set_status(status);
 
     protoInfo.set_incarnation(_incarnation);
     protoInfo.set_allocated_time_stamp(new Proto::TimeStamp{_TS_updated.ToProtoType()});
@@ -201,7 +204,15 @@ Proto::MemberInfo MemberInfo::ToProtoType() const {
 MemberInfo MemberInfo::FromJSON(const nlohmann::json& json) {
     MemberInfo info;
 
-    info._status = json["status"];
+    NodeState status;
+    if (json["status"] == "alive") {
+        status = Alive;
+    } else if (json["status"] == "suspicious") {
+        status = Suspicious;
+    } else if (json["status"] == "dead") {
+        status = Dead;
+    }
+    info._status = status;
     info._incarnation = json["incarnation"];
     info._TS_updated = milliseconds{json["latest-update"]};
 
@@ -209,7 +220,7 @@ MemberInfo MemberInfo::FromJSON(const nlohmann::json& json) {
 }
 
 nlohmann::json MemberInfo::ToJSON() const {
-    nlohmann::json json = nlohmann::json::object();
+    auto json = nlohmann::json::object();
 
     std::string status;
     switch (_status) {
@@ -251,6 +262,7 @@ void MemberInfo::IncreaseIncarnation() {
 
 void MemberInfo::SetNewTimeStamp() {
     _TS_updated = TimeStamp::Now();
+    //std::cout << "[==================ITS=MINE===================]" << ToJSON() << " -------> " <<_TS_updated.Time().count() << std::endl;
 }
 
 bool MemberInfo::IsStatusBetterThan(const MemberInfo& oth) const {
@@ -298,6 +310,15 @@ Proto::Member Member::ToProtoType() const {
     return std::move(protoMember);
 }
 
+Member& Member::operator=(Member&& rhs) noexcept {
+    if (this != & rhs) {
+        _addr = std::move(rhs._addr);
+        _info = std::move(rhs._info);
+    }
+
+    return *this;
+}
+
 const MemberAddr& Member::Addr() const {
     return _addr;
 }
@@ -318,7 +339,7 @@ Member Member::FromJSON(const nlohmann::json& json) {
 }
 
 nlohmann::json Member::ToJSON() const {
-    nlohmann::json json = nlohmann::json::object();
+    auto json = nlohmann::json::object();
 
     json["address"] = _addr.ToJSON();
     json["info"] = _info.ToJSON();

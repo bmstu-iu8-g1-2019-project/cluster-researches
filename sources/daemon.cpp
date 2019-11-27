@@ -3,6 +3,7 @@
 #include <thread>
 
 #include <behavior.hpp>
+#include <observer.hpp>
 #include <queue.hpp>
 
 int main(int argc, char** argv) {
@@ -17,13 +18,15 @@ int main(int argc, char** argv) {
 
     Table table{conf.MoveTable()};
     while (true) {
-        /// Updating table with ping-pulls and sending push-acks
+        /// Updating table with ping-pulls
         {
             auto pings = pingQ.Pop(conf.PingProcessingNum());
+            UpdateTable(table, pings);
+        }
 
-            auto conflicts = UpdateTable(table, pings);
-            auto ackWaiters = GetIndexesToGossipOwners(table, pings);
-            socket.SendAcks(table, std::move(ackWaiters));
+        // Sending push-acks
+        {
+            socket.SendAcks(table);
         }
 
         /// Reacting to ack-pulls
@@ -46,6 +49,13 @@ int main(int argc, char** argv) {
         if (lastTimeoutCheck.TimeDistance(TimeStamp::Now()) > conf.FDRepetition()) {
             table.DetectFailures(conf.FDTimout(), conf.FailuresBeforeDead());
             lastTimeoutCheck = TimeStamp::Now();
+        }
+
+        // Notifying observer
+        static TimeStamp lastObserve{TimeStamp::Now()};
+
+        if (lastObserve.TimeDistance(TimeStamp::Now()) > conf.ObserveRepetition()) {
+            socket.NotifyObserver(conf.ObserverIP(), conf.ObserverPort(), table);
         }
     }
 }

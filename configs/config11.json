@@ -19,6 +19,12 @@
   "fd-repetition" : 100,
   "fd-failures-before-dead" : 2,
 
+  "observer-ip" : "127.0.0.1",
+  "observer-port" : 7999,
+  "observe-repetition" : 500,
+
+  "log-repetition" : 1000,
+
   "table" : [
     {
       "address": {

@@ -339,12 +339,12 @@ class TimeStamp : public ::google::protobuf::Message /* @@protoc_insertion_point
 
   // accessors -------------------------------------------------------
 
-  // required uint32 time = 1;
+  // required int64 time = 1;
   bool has_time() const;
   void clear_time();
   static const int kTimeFieldNumber = 1;
-  ::google::protobuf::uint32 time() const;
-  void set_time(::google::protobuf::uint32 value);
+  ::google::protobuf::int64 time() const;
+  void set_time(::google::protobuf::int64 value);
 
   // @@protoc_insertion_point(class_scope:Proto.TimeStamp)
  private:
@@ -354,7 +354,7 @@ class TimeStamp : public ::google::protobuf::Message /* @@protoc_insertion_point
   ::google::protobuf::internal::InternalMetadataWithArena _internal_metadata_;
   ::google::protobuf::internal::HasBits<1> _has_bits_;
   mutable int _cached_size_;
-  ::google::protobuf::uint32 time_;
+  ::google::protobuf::int64 time_;
   friend struct ::protobuf_protobuf_2eproto::TableStruct;
   friend void ::protobuf_protobuf_2eproto::InitDefaultsTimeStampImpl();
 };
@@ -999,7 +999,7 @@ inline void MemberAddr::set_port(::google::protobuf::uint32 value) {
 
 // TimeStamp
 
-// required uint32 time = 1;
+// required int64 time = 1;
 inline bool TimeStamp::has_time() const {
   return (_has_bits_[0] & 0x00000001u) != 0;
 }
@@ -1010,14 +1010,14 @@ inline void TimeStamp::clear_has_time() {
   _has_bits_[0] &= ~0x00000001u;
 }
 inline void TimeStamp::clear_time() {
-  time_ = 0u;
+  time_ = GOOGLE_LONGLONG(0);
   clear_has_time();
 }
-inline ::google::protobuf::uint32 TimeStamp::time() const {
+inline ::google::protobuf::int64 TimeStamp::time() const {
   // @@protoc_insertion_point(field_get:Proto.TimeStamp.time)
   return time_;
 }
-inline void TimeStamp::set_time(::google::protobuf::uint32 value) {
+inline void TimeStamp::set_time(::google::protobuf::int64 value) {
   set_has_time();
   time_ = value;
   // @@protoc_insertion_point(field_set:Proto.TimeStamp.time)

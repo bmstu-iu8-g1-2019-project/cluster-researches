@@ -29,6 +29,11 @@ Config::Config(const std::string& path) {
     _fdRepetition = milliseconds{json["fd-repetition"]};
     _fdFailuresBeforeDead = json["fd-failures-before-dead"];
 
+    _observerIP = ip_v4::from_string(json["observer-ip"]);
+    _observerPort = json["observer-port"];
+    _observeRepetition = milliseconds{json["observe-repetition"]};
+
+    _logRepetition = milliseconds{json["log-repetition"]};
 
     _pTable = std::make_unique<Table>(MemberAddr{_ip, _port}, _latestPartSize, _randomPartSize);
     for (const auto& jsonMember : json["table"]) {
@@ -41,7 +46,7 @@ const ip_v4& Config::IP() const {
     return _ip;
 }
 
-uint16_t Config::Port() const {
+port_t Config::Port() const {
     return _port;
 }
 
@@ -85,6 +90,22 @@ size_t Config::FailuresBeforeDead() const {
     return _fdFailuresBeforeDead;
 }
 
+const ip_v4& Config::ObserverIP() const {
+    return _observerIP;
+}
+
+port_t Config::ObserverPort() const {
+    return _observerPort;
+}
+
+milliseconds Config::ObserveRepetition() const {
+    return _observeRepetition;
+}
+
+milliseconds Config::LogRepetition() const {
+    return _logRepetition;
+}
+
 Table&& Config::MoveTable() {
     return std::move(*_pTable);
 }
@@ -93,19 +114,20 @@ Table&& Config::MoveTable() {
 Socket::Socket(io_service& ioService, uint16_t port, size_t bufferSize)
   : _socket{ioService, endpoint{ip_v4{}, port}}
   , _IBuffer(bufferSize, 0)
-  , _OBuffer(bufferSize, 0)
 {}
 
 void Socket::_SendProtoGossip(const Proto::Gossip& protoGossip) {
     endpoint destEndPoint{ip_v4{protoGossip.dest().addr().ip()},
                           static_cast<uint16_t>(protoGossip.dest().addr().port())};
 
-    if (!protoGossip.SerializeToArray(_OBuffer.data(), _OBuffer.size())) {
+    // запись `Proto::Gossip` в буфер
+    std::vector<byte_t> OBuffer(protoGossip.ByteSize(), 0);
+    if (!protoGossip.SerializeToArray(OBuffer.data(), OBuffer.size())) {
         std::cout << "Proto::Gossip send failure" << std::endl;
         return;
     }
 
-    _socket.send_to(boost::asio::buffer(_OBuffer.data(), protoGossip.ByteSize()), destEndPoint);
+    _socket.send_to(boost::asio::buffer(OBuffer.data(), OBuffer.size()), destEndPoint);
 }
 
 void Socket::_GossipCatching(ThreadSaveQueue<PullGossip>& pings, ThreadSaveQueue<PullGossip>& acks) {
@@ -137,12 +159,27 @@ void Socket::_GossipCatching(ThreadSaveQueue<PullGossip>& pings, ThreadSaveQueue
     }
 }
 
+void Socket::_JSONCatching(ThreadSaveQueue<nlohmann::json>& jsons) {
+    while (true) {
+        size_t receivedBytes = _socket.receive(boost::asio::buffer(_IBuffer));
+
+        jsons.Push(nlohmann::json::from_msgpack(_IBuffer.data(), receivedBytes));
+    }
+}
+
 void Socket::RunGossipCatching(ThreadSaveQueue<PullGossip>& pings, ThreadSaveQueue<PullGossip>& acks) {
     std::thread catchingThread{&Socket::_GossipCatching, this, std::ref(pings), std::ref(acks)};
     catchingThread.detach();
 }
 
-void Socket::SendAcks(const Table& table, std::vector<size_t>&& destIndexes) {
+void Socket::RunJSONCatching(ThreadSaveQueue<nlohmann::json>& jsons) {
+    std::thread catchingThread{&Socket::_JSONCatching, this, std::ref(jsons)};
+    catchingThread.detach();
+}
+
+void Socket::SendAcks(Table& table) {
+    auto destIndexes = table.AckWaiters();
+
     Proto::Gossip protoGossip = MakeProtoGossip(table.MakePushTable(), MessageType::Ack);
 
     for (const auto& index : destIndexes) {
@@ -150,7 +187,7 @@ void Socket::SendAcks(const Table& table, std::vector<size_t>&& destIndexes) {
 
         _SendProtoGossip(protoGossip);
 
-        protoGossip.clear_dest();
+        table.ResetAckWaiter(index);
 
         std::cout << "[PUSH]:[ACK ]: " << table[index].ToJSON().dump() << std::endl;
     }
@@ -159,17 +196,17 @@ void Socket::SendAcks(const Table& table, std::vector<size_t>&& destIndexes) {
 }
 
 void Socket::Spread(Table& table, size_t destsNum) {
-    static auto destQueue = table.MakeDestList();
-
     auto protoGossip = MakeProtoGossip(table.MakePushTable(), MessageType::Ping);
 
     for (size_t i = 0; i < destsNum && i < table.Size(); ++i) {
-        if (destQueue.empty()) {
-            destQueue = table.MakeDestList();
+        // слухи распростряняются всем равномерно, но с разной очередностью
+        static std::vector<size_t> destList;
+        if (destList.empty()) {
+            destList = table.MakeDestList();
         }
 
-        size_t destIndex = destQueue.back();
-        destQueue.pop_back();
+        size_t destIndex = destList.back();
+        destList.pop_back();
 
         std::cout << "[PUSH]:[PING]: " << table[destIndex].ToJSON().dump() << std::endl;
 
@@ -177,8 +214,23 @@ void Socket::Spread(Table& table, size_t destsNum) {
 
         _SendProtoGossip(protoGossip);
 
-        table.SetAckWaiting(destIndex);
+        table.SetAckWaitingFrom(destIndex);
     }
+}
+
+void Socket::NotifyObserver(const ip_v4& observerIP, port_t observerPort, const Table& table) {
+    auto json = nlohmann::json::object();
+
+    json["owner"] = table.WhoAmI().ToJSON();
+
+    auto neighbours = nlohmann::json::array();
+    for (size_t i = 0; i < table.Size(); ++i) {
+        neighbours.push_back(table[i].ToJSON());
+    }
+    json["neighbours"] = std::move(neighbours);
+
+    endpoint observerEP{ip_v4{observerIP}, observerPort};
+    _socket.send_to(boost::asio::buffer(nlohmann::json::to_msgpack(json)), observerEP);
 }
 
 std::vector<size_t> GetIndexesToGossipOwners(const Table& table, const std::vector<PullGossip>& gossips) {
@@ -192,24 +244,15 @@ std::vector<size_t> GetIndexesToGossipOwners(const Table& table, const std::vect
     return std::move(indexes);
 }
 
-std::vector<size_t> UpdateTable(Table& table, std::vector<PullGossip>& gossips) {
-    std::vector<size_t> allConflicts;
-
+void UpdateTable(Table& table, std::vector<PullGossip>& gossips) {
     for (auto& gossip : gossips) {
-        std::vector<size_t> conflicts = table.Update(gossip.MoveTable());
-
+        // обновление себя (может только увеличиться инкарнация)
         table.Update(gossip.Dest());
+        table.Update(gossip.Owner());
+        table.Update(gossip.MoveTable());
 
-        if (!table.Update(gossip.Owner())) {
-            conflicts.push_back(table.ToIndex(gossip.Owner().Addr()));
-        }
-
-        for (auto& conflict : conflicts) {
-            allConflicts.push_back(conflict);
-        }
+        table.SetAckWaiter(table.ToIndex(gossip.Owner().Addr()));
     }
-
-    return std::move(allConflicts);
 }
 
 void SetDest(Proto::Gossip& protoGossip, const Member& dest) {
@@ -219,7 +262,7 @@ void SetDest(Proto::Gossip& protoGossip, const Member& dest) {
 
 void AcceptAcks(Table& table, std::vector<PullGossip>&& acks) {
     for (const auto& ack : acks) {
-        table.ResetAckWaiting(table.ToIndex( ack.Owner().Addr() ));
+        table.ResetAckWaitingFrom(table.ToIndex( ack.Owner().Addr() ));
     }
 
     acks.clear();

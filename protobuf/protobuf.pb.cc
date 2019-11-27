@@ -287,7 +287,7 @@ void AddDescriptorsImpl() {
   static const char descriptor[] GOOGLE_PROTOBUF_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
       "\n\016protobuf.proto\022\005Proto\"&\n\nMemberAddr\022\n\n"
       "\002IP\030\001 \002(\r\022\014\n\004port\030\002 \002(\r\"\031\n\tTimeStamp\022\014\n\004"
-      "time\030\001 \002(\r\"\236\001\n\nMemberInfo\022\'\n\006status\030\001 \002("
+      "time\030\001 \002(\003\"\236\001\n\nMemberInfo\022\'\n\006status\030\001 \002("
       "\0162\027.Proto.MemberInfo.State\022\023\n\013incarnatio"
       "n\030\002 \002(\r\022$\n\ntime_stamp\030\003 \002(\0132\020.Proto.Time"
       "Stamp\",\n\005State\022\t\n\005ALIVE\020\000\022\016\n\nSUSPICIOUS\020"
@@ -704,7 +704,7 @@ TimeStamp::TimeStamp(const TimeStamp& from)
 
 void TimeStamp::SharedCtor() {
   _cached_size_ = 0;
-  time_ = 0u;
+  time_ = GOOGLE_LONGLONG(0);
 }
 
 TimeStamp::~TimeStamp() {
@@ -744,7 +744,7 @@ void TimeStamp::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  time_ = 0u;
+  time_ = GOOGLE_LONGLONG(0);
   _has_bits_.Clear();
   _internal_metadata_.Clear();
 }
@@ -759,13 +759,13 @@ bool TimeStamp::MergePartialFromCodedStream(
     tag = p.first;
     if (!p.second) goto handle_unusual;
     switch (::google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag)) {
-      // required uint32 time = 1;
+      // required int64 time = 1;
       case 1: {
         if (static_cast< ::google::protobuf::uint8>(tag) ==
             static_cast< ::google::protobuf::uint8>(8u /* 8 & 0xFF */)) {
           set_has_time();
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
-                   ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
+                   ::google::protobuf::int64, ::google::protobuf::internal::WireFormatLite::TYPE_INT64>(
                  input, &time_)));
         } else {
           goto handle_unusual;
@@ -800,9 +800,9 @@ void TimeStamp::SerializeWithCachedSizes(
   (void) cached_has_bits;
 
   cached_has_bits = _has_bits_[0];
-  // required uint32 time = 1;
+  // required int64 time = 1;
   if (cached_has_bits & 0x00000001u) {
-    ::google::protobuf::internal::WireFormatLite::WriteUInt32(1, this->time(), output);
+    ::google::protobuf::internal::WireFormatLite::WriteInt64(1, this->time(), output);
   }
 
   if (_internal_metadata_.have_unknown_fields()) {
@@ -820,9 +820,9 @@ void TimeStamp::SerializeWithCachedSizes(
   (void) cached_has_bits;
 
   cached_has_bits = _has_bits_[0];
-  // required uint32 time = 1;
+  // required int64 time = 1;
   if (cached_has_bits & 0x00000001u) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(1, this->time(), target);
+    target = ::google::protobuf::internal::WireFormatLite::WriteInt64ToArray(1, this->time(), target);
   }
 
   if (_internal_metadata_.have_unknown_fields()) {
@@ -842,10 +842,10 @@ size_t TimeStamp::ByteSizeLong() const {
       ::google::protobuf::internal::WireFormat::ComputeUnknownFieldsSize(
         _internal_metadata_.unknown_fields());
   }
-  // required uint32 time = 1;
+  // required int64 time = 1;
   if (has_time()) {
     total_size += 1 +
-      ::google::protobuf::internal::WireFormatLite::UInt32Size(
+      ::google::protobuf::internal::WireFormatLite::Int64Size(
         this->time());
   }
   int cached_size = ::google::protobuf::internal::ToCachedSize(total_size);

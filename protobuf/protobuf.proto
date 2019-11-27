@@ -8,7 +8,7 @@ message MemberAddr {
 }
 
 message TimeStamp {
-  required uint32 time = 1;
+  required int64 time = 1;
 }
 
 message MemberInfo {
