@@ -1,12 +1,12 @@
 {
   "address" : {
     "ip" : "127.0.0.1",
-    "port" : 8016
+    "port" : 8020
   },
 
   "docker-port" : 8000,
 
-  "buffer-size" : 1500,
+  "buffer-size" : 2500,
 
   "latest-part-size" : 5,
   "random-part-size" : 5,

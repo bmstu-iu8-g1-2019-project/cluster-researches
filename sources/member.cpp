@@ -88,7 +88,7 @@ size_t MemberAddr::Hasher::operator()(const MemberAddr& key) const {
 
 TimeStamp::TimeStamp()
   : _time{std::chrono::duration_cast<milliseconds>(
-              system_clock::now().time_since_epoch()
+              steady_clock::now().time_since_epoch()
           ).count()}
 {}
 
@@ -262,11 +262,10 @@ void MemberInfo::IncreaseIncarnation() {
 
 void MemberInfo::SetNewTimeStamp() {
     _TS_updated = TimeStamp::Now();
-    //std::cout << "[==================ITS=MINE===================]" << ToJSON() << " -------> " <<_TS_updated.Time().count() << std::endl;
 }
 
 bool MemberInfo::IsStatusBetterThan(const MemberInfo& oth) const {
-    return _status > oth._status;
+    return _status < oth._status;
 }
 
 bool MemberInfo::IsIncarnationMoreThan(const MemberInfo& oth) const {

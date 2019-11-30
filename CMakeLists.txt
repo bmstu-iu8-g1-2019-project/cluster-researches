@@ -21,8 +21,8 @@ huntergate(
 project(gossip-daemon)
 
 
-hunter_add_package(GTest)
-find_package(GTest CONFIG REQUIRED)
+#[[hunter_add_package(GTest)
+find_package(GTest CONFIG REQUIRED)]]
 
 hunter_add_package(nlohmann_json)
 find_package(nlohmann_json CONFIG REQUIRED)
@@ -31,10 +31,10 @@ hunter_add_package(Boost COMPONENTS system)
 find_package(Boost CONFIG REQUIRED system)
 
 hunter_add_package(Protobuf)
-find_package(Protobuf CONFIG REQUIRED)
+find_package(Protobuf CONFIG REQUIRED cpp)
 
 
-set(generated_files protobuf.pb.cc protobuf.pb.h)
+#[[set(generated_files protobuf.pb.cc protobuf.pb.h)
 
 add_custom_command(
         OUTPUT ${generated_files}
@@ -42,11 +42,11 @@ add_custom_command(
                                  -I ${CMAKE_CURRENT_SOURCE_DIR}/protobuf ${CMAKE_CURRENT_SOURCE_DIR}/protobuf/protobuf.proto
         COMMENT "Generating ${generated_files} from ${proto_file}"
         VERBATIM
-)
+)]]
 
-add_library(protobuf ${CMAKE_CURRENT_BINARY_DIR}/protobuf.pb.cc)
+add_library(protobuf ${CMAKE_CURRENT_SOURCE_DIR}/protobuf/protobuf.pb.cc)
 target_link_libraries(protobuf protobuf::libprotobuf)
-target_include_directories(protobuf PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/..)
+target_include_directories(protobuf PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/protobuf)
 
 
 add_library(types STATIC

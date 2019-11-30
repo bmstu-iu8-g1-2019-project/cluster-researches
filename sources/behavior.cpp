@@ -2,14 +2,16 @@
 
 #include <behavior.hpp>
 
-Config::Config(const std::string& path) {
-    std::ifstream file{path};
+Config::Config(char* configPath) {
+    std::ifstream file{configPath};
 
     if (!file.is_open()) {
-        return;
+        throw std::runtime_error{"Unable to open config file"};
     }
 
     auto json = nlohmann::json::parse(file);
+
+    _dockerPort = json["docker-port"];
 
     _ip = ip_v4::from_string(json["address"]["ip"]);
     _port = json["address"]["port"];
@@ -40,6 +42,12 @@ Config::Config(const std::string& path) {
         auto member = Member{MemberAddr::FromJSON(jsonMember["address"])};
         _pTable->Update(member);
     }
+
+    std::cout << "end of config" << std::endl;
+}
+
+port_t Config::DockerPort() const {
+    return _dockerPort;
 }
 
 const ip_v4& Config::IP() const {
@@ -123,7 +131,6 @@ void Socket::_SendProtoGossip(const Proto::Gossip& protoGossip) {
     // запись `Proto::Gossip` в буфер
     std::vector<byte_t> OBuffer(protoGossip.ByteSize(), 0);
     if (!protoGossip.SerializeToArray(OBuffer.data(), OBuffer.size())) {
-        std::cout << "Proto::Gossip send failure" << std::endl;
         return;
     }
 
@@ -144,14 +151,12 @@ void Socket::_GossipCatching(ThreadSaveQueue<PullGossip>& pings, ThreadSaveQueue
 
         switch (gossip.Type()) {
             case MessageType::Ping :
-                std::cout << "[PULL]:[PING]: " << gossip.Owner().ToJSON().dump() << std::endl;
-
+                std::cout << "[PULL][PING]: " << gossip.Owner().ToJSON() << std::endl;
                 pings.Push(std::move(gossip));
 
                 break;
             case MessageType::Ack :
-                std::cout << "[PULL]:[ACK ]: " << gossip.Owner().ToJSON().dump() << std::endl;
-
+                std::cout << "[PULL][ACK ]: " << gossip.Owner().ToJSON() << std::endl;
                 acks.Push(std::move(gossip));
 
                 break;
@@ -185,11 +190,10 @@ void Socket::SendAcks(Table& table) {
     for (const auto& index : destIndexes) {
         SetDest(protoGossip, table[index]);
 
+        std::cout << "[PUSH][ACK ]: " << table[index].ToJSON() << std::endl;
         _SendProtoGossip(protoGossip);
 
         table.ResetAckWaiter(index);
-
-        std::cout << "[PUSH]:[ACK ]: " << table[index].ToJSON().dump() << std::endl;
     }
 
     destIndexes.clear();
@@ -208,10 +212,9 @@ void Socket::Spread(Table& table, size_t destsNum) {
         size_t destIndex = destList.back();
         destList.pop_back();
 
-        std::cout << "[PUSH]:[PING]: " << table[destIndex].ToJSON().dump() << std::endl;
-
         SetDest(protoGossip, table[destIndex]);
 
+        std::cout << "[PUSH][PING]: " << table[destIndex].ToJSON() << std::endl;
         _SendProtoGossip(protoGossip);
 
         table.SetAckWaitingFrom(destIndex);
@@ -261,7 +264,11 @@ void SetDest(Proto::Gossip& protoGossip, const Member& dest) {
 }
 
 void AcceptAcks(Table& table, std::vector<PullGossip>&& acks) {
-    for (const auto& ack : acks) {
+    for (auto& ack : acks) {
+        table.Update(ack.Owner());
+        table.Update(ack.Dest());
+        table.Update(ack.MoveTable());
+
         table.ResetAckWaitingFrom(table.ToIndex( ack.Owner().Addr() ));
     }
 

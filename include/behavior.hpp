@@ -16,6 +16,8 @@ typedef boost::asio::ip::udp::endpoint endpoint;
 
 class Config {
 private:
+    port_t _dockerPort;
+
     ip_v4 _ip;
     port_t _port;
 
@@ -51,7 +53,9 @@ private:
     std::unique_ptr<Table> _pTable;
 
 public:
-    explicit Config(const std::string& path);
+    explicit Config(char* configPath);
+
+    port_t DockerPort() const;
 
     const ip_v4& IP() const;
     port_t Port() const;

@@ -16,7 +16,6 @@ public:
         if (!_IsInMatrix(owner)) {
             _NewRow(owner);
         }
-
         auto ownerFound = _indexes.find(owner.Addr());
 
         for (const auto& jsonMember : json["neighbours"]) {
@@ -25,7 +24,6 @@ public:
             if (!_IsInMatrix(neighbour)) {
                 _NewRow(neighbour);
             }
-
             auto neighbourFound = _indexes.find(neighbour.Addr());
 
             _matrix[ownerFound->second][neighbourFound->second] = std::move(neighbour);
@@ -69,6 +67,7 @@ private:
         }
     }
 };
+
 
 int main(int argc, char** argv) {
     Config config{argv[1]};

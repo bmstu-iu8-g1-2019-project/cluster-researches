@@ -4,6 +4,8 @@
     "port" : 8025
   },
 
+  "docker-port" : 8000,
+
   "buffer-size" : 1500,
 
   "latest-part-size" : 5,
@@ -15,21 +17,27 @@
   "spread-destination-num" : 4,
   "spread-repetition" : 1000,
 
-  "fd-timeout" : 800,
+  "fd-timeout" : 100,
   "fd-repetition" : 100,
-  "fd-failures-before-dead" : 2,
+  "fd-failures-before-dead" : 1,
+
+  "observer-ip" : "127.0.0.1",
+  "observer-port" : 7999,
+  "observe-repetition" : 100,
+
+  "log-repetition" : 1000,
 
   "table" : [
     {
       "address": {
         "ip": "127.0.0.1",
-        "port": 8000
+        "port": 8002
       }
     },
     {
-      "address" : {
-        "ip" : "127.0.0.1",
-        "port" : 8001
+      "address": {
+        "ip": "127.0.0.1",
+        "port": 8003
       }
     }
   ]

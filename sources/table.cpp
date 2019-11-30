@@ -77,6 +77,7 @@ void Table::Update(const Member& member) {
             member.Info().Status() == MemberInfo::Dead) {
             _me.Info().IncreaseIncarnation();
         }
+
         return;
     }
 
@@ -99,6 +100,7 @@ void Table::Update(const Member& member) {
     if (member.Info(). IsIncarnationMoreThan (knownMember.Info())) {
         knownMember.Info() = member.Info();
         _InsertInLatest(ToIndex(member.Addr()));
+
         return;
     }
 
@@ -192,35 +194,6 @@ PushTable Table::MakePushTable() const {
     PushTable pushTable{*this, std::move(indexes)};
 
     return std::move(pushTable);
-
-    // Самый быстрый алгоритм, что я придумал, но очень дорогой по памяти
-    /*std::vector<size_t> indexes;
-
-    for (const auto& latest : _latestUpdates) {
-        indexes.push_back(latest);
-    }
-
-    std::vector<size_t> oldestUpdates;
-    oldestUpdates.resize(_members.size() - _latestUpdates.size());
-    for (size_t index = 0; index < _members.size(); ++index) {
-        if (std::find(_latestUpdates.begin(), _latestUpdates.end(), index) == indexes.end()) {
-            oldestUpdates.push_back(index);
-        }
-    }
-
-    std::shuffle(oldestUpdates.begin(), oldestUpdates.end(), rand);
-
-    for (size_t i = 0; i < _randomPartSize &&
-                       i + _latestUpdates.size() < _members.size();
-                       ++i) {
-        oldestUpdates.push_back(indexes[i]);
-    }
-
-    PushTable pushTable{std::make_shared<const Table>(this, [](const Table*){}),
-                        std::move(indexes)
-    };
-
-    return std::move(pushTable);*/
 }
 
 std::vector<size_t> Table::MakeDestList() const {

@@ -59,7 +59,7 @@ public:
  * класс представления момента времени
  */
 class TimeStamp {
-    typedef std::chrono::system_clock system_clock;
+    typedef std::chrono::steady_clock steady_clock;
 
 private:
     // время хранится в количестве миллисекундах от нулевого времени
