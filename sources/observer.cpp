@@ -70,10 +70,10 @@ private:
 
 
 int main(int argc, char** argv) {
-    Config config{argv[1]};
+    Config config{argv[1], argv[2], argv[3]};
 
     boost::asio::io_service ioService;
-    Socket socket{ioService, config.ObserverPort(), config.BufferSize()};
+    Socket socket{ioService, config.DockerPort(), config.BufferSize()};
 
     ThreadSaveQueue<nlohmann::json> jsonQ;
     socket.RunJSONCatching(jsonQ);

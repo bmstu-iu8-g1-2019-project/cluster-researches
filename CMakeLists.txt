@@ -57,10 +57,10 @@ add_library(types STATIC
 add_library(behavior
   ${CMAKE_CURRENT_SOURCE_DIR}/sources/behavior.cpp
 )
-add_executable(observer
+add_executable(gossip-observer
   ${CMAKE_CURRENT_SOURCE_DIR}/sources/observer.cpp
 )
-add_executable(daemon
+add_executable(gossip-daemon
   ${CMAKE_CURRENT_SOURCE_DIR}/sources/daemon.cpp
 )
 
@@ -72,10 +72,10 @@ target_include_directories(types
 target_include_directories(behavior
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-target_include_directories(observer
+target_include_directories(gossip-observer
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-target_include_directories(daemon
+target_include_directories(gossip-daemon
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
@@ -89,16 +89,13 @@ target_link_libraries(behavior
   PUBLIC types
   PUBLIC nlohmann_json::nlohmann_json
 )
-target_link_libraries(observer
+target_link_libraries(gossip-observer
   PUBLIC types
   PUBLIC behavior
   PUBLIC Boost::system
 )
-target_link_libraries(daemon
+target_link_libraries(gossip-daemon
   PUBLIC behavior
   PUBLIC -pthread
 )
 
-
-enable_testing()
-add_test(NAME unit_tests COMMAND tests)

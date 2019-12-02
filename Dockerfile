@@ -6,17 +6,11 @@ RUN apt-get update && \
                        make \
                        tree
 
-ADD ./cmake-build-debug/daemon /src/
-ADD ./configs /src/
-
 WORKDIR /src
 
-VOLUME /src/configs
+ADD . .
 
-RUN ls ./configs
-
+RUN cmake . && make
 RUN tree .
 
-EXPOSE 8000/udp
-
-ENTRYPOINT ["./daemon"]
+CMD [""]

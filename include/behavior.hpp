@@ -53,7 +53,7 @@ private:
     std::unique_ptr<Table> _pTable;
 
 public:
-    explicit Config(char* configPath);
+    explicit Config(char* configPath, char* strIP, char* strPort);
 
     port_t DockerPort() const;
 

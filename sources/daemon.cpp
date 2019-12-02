@@ -7,14 +7,14 @@
 #include <queue.hpp>
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
+    if (argc < 3) {
         return 1;
     }
 
-    Config conf{argv[1]};
+    Config conf{argv[1], argv[2], argv[3]};
 
     io_service ioService;
-    Socket socket(ioService, conf.Port(), conf.BufferSize());
+    Socket socket(ioService, conf.DockerPort(), conf.BufferSize());
 
     ThreadSaveQueue<PullGossip> pingQ;
     ThreadSaveQueue<PullGossip> ackQ;

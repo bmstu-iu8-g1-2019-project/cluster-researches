@@ -1,9 +1,4 @@
 {
-  "address" : {
-    "ip" : "127.0.0.1",
-    "port" : 8016
-  },
-
   "docker-port" : 8000,
 
   "buffer-size" : 1500,
@@ -27,17 +22,17 @@
 
   "log-repetition" : 1000,
 
-  "table" : [
+  "entry-point" : [
     {
       "address": {
-        "ip": "127.0.0.1",
-        "port": 8002
+        "ip": "192.168.0.2",
+        "port": 8000
       }
     },
     {
       "address": {
-        "ip": "127.0.0.1",
-        "port": 8003
+        "ip": "192.168.0.3",
+        "port": 8000
       }
     }
   ]

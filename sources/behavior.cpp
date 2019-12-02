@@ -2,7 +2,10 @@
 
 #include <behavior.hpp>
 
-Config::Config(char* configPath) {
+Config::Config(char* configPath, char* strIP, char* strPort) {
+    std::cout << configPath << std::endl;
+    std::cout << strIP << std::endl;
+
     std::ifstream file{configPath};
 
     if (!file.is_open()) {
@@ -12,38 +15,122 @@ Config::Config(char* configPath) {
     auto json = nlohmann::json::parse(file);
 
     _dockerPort = json["docker-port"];
+    std::cout << "Set docker port : " << _dockerPort << std::endl;
 
-    _ip = ip_v4::from_string(json["address"]["ip"]);
-    _port = json["address"]["port"];
+    _ip = ip_v4::from_string(strIP);
+    _port = std::stoul(strPort);
+    std::cout << "Set port : " << _port << std::endl;
 
-    _bufferSize = json["buffer-size"];
 
-    _latestPartSize = json["latest-part-size"];
-    _randomPartSize = json["random-part-size"];
+    auto found = json.find("buffer-size");
+    if (found != json.end()) {
+        _bufferSize = json["buffer-size"];
+    } else {
+        _bufferSize = 1500;
+        std::cout << "Set default \"buffer-size\": " << _bufferSize << std::endl;
+    }
 
-    _pingProcNum = json["ping-processing-num"];
-    _ackProcNum = json["ack-processing-num"];
 
-    _spreadDestsNum = json["spread-destination-num"];
-    _spreadRepetition = milliseconds{json["spread-repetition"]};
+    found = json.find("latest-part-size");
+    if (found != json.end()) {
+        _latestPartSize = json["latest-part-size"];
+    } else {
+        _latestPartSize = 10;
+        std::cout << "Set default \"latest-part-size\": " << _latestPartSize << std::endl;
+    }
 
-    _fdTimeout = milliseconds{json["fd-timeout"]};
-    _fdRepetition = milliseconds{json["fd-repetition"]};
-    _fdFailuresBeforeDead = json["fd-failures-before-dead"];
+    found = json.find("random-part-size");
+    if (found != json.end()) {
+        _randomPartSize = json["random-part-size"];
+    } else {
+        _randomPartSize = 10;
+        std::cout << "Set default \"random-part-size\": " << _randomPartSize << std::endl;
+    }
+
+
+    found = json.find("ping-processing-num");
+    if (found != json.end()) {
+        _pingProcNum = json["ping-processing-num"];
+    } else {
+        _pingProcNum = 10;
+        std::cout << "Set default \"ping-processing-num\": " << _pingProcNum << std::endl;
+    }
+
+    found = json.find("ack-processing-num");
+    if (found != json.end()) {
+        _ackProcNum = json["ack-processing-num"];
+    } else {
+        _ackProcNum = 10;
+        std::cout << "Set default \"ack-processing-num\": " << _ackProcNum << std::endl;
+    }
+
+
+    found = json.find("spread-destination-num");
+    if (found != json.end()) {
+        _spreadDestsNum = json["spread-destination-num"];
+    } else {
+        _spreadDestsNum = 4;
+        std::cout << "Set default \"spread-destination-num\": " << _spreadDestsNum << std::endl;
+    }
+
+    found = json.find("spread-repetition");
+    if (found != json.end()) {
+        _spreadRepetition = milliseconds{json["spread-repetition"]};
+    } else {
+        _spreadRepetition = milliseconds{1000};
+        std::cout << "Set default \"spread-repetition\": " << _spreadRepetition.count() << std::endl;
+    }
+
+
+    found = json.find("fd-timeout");
+    if (found != json.end()) {
+        _fdTimeout = milliseconds{json["fd-timeout"]};
+    } else {
+        _fdTimeout = milliseconds{500};
+        std::cout << "Set default \"fd-timeout\": " << _fdTimeout.count() << std::endl;
+    }
+
+    found = json.find("fd-repetition");
+    if (found != json.end()) {
+        _fdRepetition = milliseconds{json["fd-repetition"]};
+    } else {
+        _fdRepetition = milliseconds{100};
+        std::cout << "Set default \"fd-repetition\": " << _fdRepetition.count() << std::endl;
+    }
+
+    found = json.find("fd-failures-before-dead");
+    if (found != json.end()) {
+        _fdFailuresBeforeDead = json["fd-failures-before-dead"];
+    } else {
+        _fdFailuresBeforeDead = 1;
+        std::cout << "Set default \"fd-failures-before-dead\": " << _fdFailuresBeforeDead << std::endl;
+    }
+
 
     _observerIP = ip_v4::from_string(json["observer-ip"]);
     _observerPort = json["observer-port"];
-    _observeRepetition = milliseconds{json["observe-repetition"]};
 
-    _logRepetition = milliseconds{json["log-repetition"]};
+    found = json.find("observe-repetition");
+    if (found != json.end()) {
+        _observeRepetition = milliseconds{json["observe-repetition"]};
+    } else {
+        _observeRepetition = milliseconds{200};
+        std::cout << "Set default \"observe-repetition\": " << _observeRepetition.count() << std::endl;
+    }
+
+    found = json.find("log-repetition");
+    if (found != json.end()) {
+        _logRepetition = milliseconds{json["log-repetition"]};
+    } else {
+        _logRepetition = milliseconds{1000};
+        std::cout << "Set default \"log-repetition\": " << _logRepetition.count() << std::endl;
+    }
 
     _pTable = std::make_unique<Table>(MemberAddr{_ip, _port}, _latestPartSize, _randomPartSize);
-    for (const auto& jsonMember : json["table"]) {
+    for (const auto& jsonMember : json["entry-point"]) {
         auto member = Member{MemberAddr::FromJSON(jsonMember["address"])};
         _pTable->Update(member);
     }
-
-    std::cout << "end of config" << std::endl;
 }
 
 port_t Config::DockerPort() const {
