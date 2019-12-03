@@ -73,8 +73,9 @@ void Table::Update(const Member& member) {
     // если известно, что другая нода думает, что мы мертвы или
     // подозрительны, то необходимо увеличить инкарнацию
     if (member.Addr() == WhoAmI().Addr()) {
-        if (member.Info().Status() == MemberInfo::Suspicious ||
-            member.Info().Status() == MemberInfo::Dead) {
+        if ((member.Info().Status() == MemberInfo::Suspicious ||
+            member.Info().Status() == MemberInfo::Dead) &&
+            !_me.Info().IsIncarnationMoreThan(member.Info()))    {
             _me.Info().IncreaseIncarnation();
         }
 
