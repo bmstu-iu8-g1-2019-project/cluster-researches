@@ -14,7 +14,8 @@ int main(int argc, char** argv) {
     Config conf{argv[1], argv[2], argv[3]};
 
     io_service ioService;
-    Socket socket(ioService, conf.DockerPort(), conf.BufferSize());
+    port_t port = (conf.Containerization()) ? conf.DockerPort() : conf.Port();
+    Socket socket(ioService, port, conf.BufferSize());
 
     ThreadSaveQueue<PullGossip> pingQ;
     ThreadSaveQueue<PullGossip> ackQ;

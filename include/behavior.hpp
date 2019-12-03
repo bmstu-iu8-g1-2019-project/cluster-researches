@@ -16,6 +16,8 @@ typedef boost::asio::ip::udp::endpoint endpoint;
 
 class Config {
 private:
+    bool _containerization;
+
     port_t _dockerPort;
 
     ip_v4 _ip;
@@ -54,6 +56,8 @@ private:
 
 public:
     explicit Config(char* configPath, char* strIP, char* strPort);
+
+    bool Containerization() const;
 
     port_t DockerPort() const;
 

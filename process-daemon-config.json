@@ -1,0 +1,34 @@
+{
+  "containerization" : false,
+
+  "buffer-size" : 1500,
+
+  "latest-part-size" : 10,
+  "random-part-size" : 10,
+
+  "ping-processing-num" : 100,
+  "ack-processing-num" : 100,
+
+  "spread-destination-num" : 4,
+  "spread-repetition" : 500,
+
+  "fd-timeout" : 100,
+  "fd-repetition" : 100,
+  "fd-failures-before-dead" : 2,
+
+  "observer-ip" : "127.0.0.1",
+  "observer-port" : 7999,
+  "observe-repetition" : 100,
+
+  "log-repetition" : 1000,
+
+  "entry-point" : [
+    {
+      "host-info" : "semen",
+      "address" : {
+        "ip" : "127.0.0.1",
+        "port" : 8001
+      }
+    }
+  ]
+}

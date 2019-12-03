@@ -1,4 +1,5 @@
 {
+  "containerization" : true,
   "docker-port" : 8000,
 
   "buffer-size" : 1500,
@@ -26,13 +27,13 @@
     {
       "address": {
         "ip": "192.168.0.2",
-        "port": 8000
+        "port": 8002
       }
     },
     {
       "address": {
         "ip": "192.168.0.3",
-        "port": 8000
+        "port": 8003
       }
     }
   ]

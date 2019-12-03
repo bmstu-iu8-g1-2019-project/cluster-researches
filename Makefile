@@ -16,7 +16,8 @@ build-observer:
 	docker build -t ${observer-image}:${image-tag} ./observer/
 
 run-daemon:
-	docker run --name $(name) \
+	docker run -d \
+	           --name $(name) \
 	           --rm \
 	           --net macvlan0 \
 	           -p $(ip):$(port):${container-port}/udp \
@@ -25,7 +26,8 @@ run-daemon:
 	           $(port)
 
 run-observer:
-	docker run --name $(name) \
+	docker run -d \
+	           --name $(name) \
     	       --rm \
     	       --net macvlan0 \
     	       -p $(ip):$(port):${container-port}/udp \

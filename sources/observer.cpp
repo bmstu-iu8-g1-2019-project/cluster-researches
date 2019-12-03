@@ -73,7 +73,8 @@ int main(int argc, char** argv) {
     Config config{argv[1], argv[2], argv[3]};
 
     boost::asio::io_service ioService;
-    Socket socket{ioService, config.DockerPort(), config.BufferSize()};
+    port_t port = (config.Containerization()) ? config.DockerPort() : config.Port();
+    Socket socket{ioService, port, config.BufferSize()};
 
     ThreadSaveQueue<nlohmann::json> jsonQ;
     socket.RunJSONCatching(jsonQ);

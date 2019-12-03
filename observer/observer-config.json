@@ -1,4 +1,5 @@
 {
+  "containerization" : true,
   "buffer-size" : 2500,
 
   "docker-port" : 8000,
