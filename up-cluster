@@ -6,6 +6,6 @@ shift
 
 for port in "$@"
 do
-    exec ./cmake-build-debug/gossip-daemon ./process-daemon-config.json $ip $port > daemon-log${ip}:${port}.txt &
+    exec ./gossip-daemon ./process-daemon-config.json $ip $port > daemon-log${ip}:${port}.txt &
     shift
 done
