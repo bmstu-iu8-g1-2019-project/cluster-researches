@@ -9,14 +9,14 @@
   "ping-processing-num" : 100,
   "ack-processing-num" : 100,
 
-  "spread-destination-num" : 4,
+  "spread-destination-num" : 1,
   "spread-repetition" : 500,
 
   "fd-timeout" : 100,
   "fd-repetition" : 100,
   "fd-failures-before-dead" : 2,
 
-  "observer-ip" : "127.0.0.1",
+  "observer-ip" : "172.25.115.224",
   "observer-port" : 7999,
   "observe-repetition" : 100,
 
@@ -26,8 +26,8 @@
     {
       "host-info" : "semen",
       "address" : {
-        "ip" : "127.0.0.1",
-        "port" : 8001
+        "ip" : "172.25.115.224",
+        "port" : 801
       }
     }
   ]

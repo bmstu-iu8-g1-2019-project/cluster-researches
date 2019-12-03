@@ -36,13 +36,13 @@ public:
             for (const auto& element : row) {
                 switch (element.Info().Status()) {
                     case MemberInfo::Alive :
-                        out << "   alive  ";
+                        out << " ";
                         break;
                     case MemberInfo::Suspicious :
-                        out << "suspicious";
+                        out << "s";
                         break;
                     case MemberInfo::Dead :
-                        out << "   DEAD   ";
+                        out << "D";
                 }
                 out << "|";
             }

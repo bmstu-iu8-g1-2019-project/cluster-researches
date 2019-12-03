@@ -290,7 +290,12 @@ const Member& PullTable::operator[](size_t index) const {
 
 PushTable::PushTable(const Table& table, std::vector<size_t>&& indexes)
   : _refTable{table}
-  , _indexes{indexes}
+  , _indexes{std::move(indexes)}
+{}
+
+PushTable::PushTable(PushTable&& oth) noexcept
+  : _refTable(oth._refTable)
+  , _indexes{std::move(oth._indexes)}
 {}
 
 Proto::Table PushTable::ToProtoType() const {

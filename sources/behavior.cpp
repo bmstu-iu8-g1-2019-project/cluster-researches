@@ -255,13 +255,13 @@ void Socket::_GossipCatching(ThreadSaveQueue<PullGossip>& pings, ThreadSaveQueue
 
         switch (gossip.Type()) {
             case MessageType::Ping :
-                std::cout << "[PULL][PING]: " << "(size : " << protoGossip.ByteSize() << " )"
+                std::cout << "[PULL][PING]: " << "(size : " << receivedBytes << " )"
                           << gossip.Owner().ToJSON() << std::endl;
                 pings.Push(std::move(gossip));
 
                 break;
             case MessageType::Ack :
-                std::cout << "[PULL][ACK ]: " << "(size : " << protoGossip.ByteSize() << " )"
+                std::cout << "[PULL][ACK ]: " << "(size : " << receivedBytes << " )"
                           << gossip.Owner().ToJSON() << std::endl;
                 acks.Push(std::move(gossip));
 
@@ -367,7 +367,6 @@ void UpdateTable(Table& table, std::vector<PullGossip>& gossips) {
 }
 
 void SetDest(Proto::Gossip& protoGossip, const Member& dest) {
-    protoGossip.clear_dest();
     protoGossip.set_allocated_dest(new Proto::Member{dest.ToProtoType()});
 }
 

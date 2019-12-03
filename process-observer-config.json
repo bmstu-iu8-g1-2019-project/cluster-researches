@@ -1,0 +1,11 @@
+{
+  "buffer-size" : 5000,
+
+  "observer-ip" : "172.25.115.224",
+  "observer-port" : 7999,
+  "observe-repetition" : 100,
+
+  "log-repetition" : 1000,
+
+  "table" : []
+}

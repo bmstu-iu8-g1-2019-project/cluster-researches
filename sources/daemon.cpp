@@ -15,6 +15,7 @@ int main(int argc, char** argv) {
 
     io_service ioService;
     port_t port = (conf.Containerization()) ? conf.DockerPort() : conf.Port();
+    std::cout << "Binded on port : " << port << std::endl;
     Socket socket(ioService, port, conf.BufferSize());
 
     ThreadSaveQueue<PullGossip> pingQ;

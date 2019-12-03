@@ -1,11 +1,19 @@
 #!/bin/bash
 
+exec_path=$1
+echo ${exec_path}
+shift
+
+config_path=$1
+echo ${config_path}
+shift
+
 ip=$1
-echo $ip
+echo ${ip}
 shift
 
 for port in "$@"
 do
-    exec ./gossip-daemon ./process-daemon-config.json $ip $port > daemon-log${ip}:${port}.txt &
+    exec ${exec_path} ${config_path} ${ip} ${port} > daemon-log${ip}:${port}.txt &
     shift
 done

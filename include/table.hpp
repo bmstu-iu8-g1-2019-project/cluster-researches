@@ -170,6 +170,7 @@ private:
 
 public:
     PushTable(const Table& table, std::vector<size_t>&& indexes);
+    PushTable(PushTable&& oth) noexcept;
     // переод в структкру `Proto::Table`
     Proto::Table ToProtoType() const;
 
