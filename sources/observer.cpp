@@ -1,7 +1,5 @@
 // Copyright 2019 AndreevSemen semen.andreev00@mail.ru
 
-#include <observer.hpp>
-#include <queue.hpp>
 #include <behavior.hpp>
 
 class MemberMatrix {
@@ -9,17 +7,18 @@ private:
     std::unordered_map<MemberAddr, size_t ,MemberAddr::Hasher> _indexes;
     std::vector<std::vector<Member>> _matrix;
 
+    std::vector<TimeStamp> _fd;
+
 public:
-    void Push(const nlohmann::json& json) {
-        Member owner = Member::FromJSON(json["owner"]);
-
-        if (!_IsInMatrix(owner)) {
-            _NewRow(owner);
+    void Push(PullGossip&& pull) {
+        if (!_IsInMatrix(pull.Owner())) {
+            _NewRow(pull.Owner());
         }
-        auto ownerFound = _indexes.find(owner.Addr());
+        auto ownerFound = _indexes.find(pull.Owner().Addr());
 
-        for (const auto& jsonMember : json["neighbours"]) {
-            auto neighbour = Member::FromJSON(jsonMember);
+        auto table = pull.MoveTable();
+        for (size_t i = 0; i < table.Size(); ++i) {
+            auto neighbour = table[i];
 
             if (!_IsInMatrix(neighbour)) {
                 _NewRow(neighbour);
@@ -28,7 +27,19 @@ public:
 
             _matrix[ownerFound->second][neighbourFound->second] = std::move(neighbour);
         }
-        _matrix[ownerFound->second][ownerFound->second] = std::move(owner);
+        _matrix[ownerFound->second][ownerFound->second] = pull.Owner();
+        _fd[ownerFound->second] = TimeStamp::Now();
+    }
+
+    void DetectFailure(milliseconds timeout) {
+        for (size_t i = 0; i < _fd.size(); ++i) {
+            if (_fd[i].Time() != milliseconds{0} &&
+                _fd[i].TimeDistance(TimeStamp::Now()) > timeout) {
+                _matrix[i][i].Info().Status() = MemberInfo::Dead;
+                _fd[i] = TimeStamp{milliseconds{0}};
+                std::cout << "Detected failure" << std::endl;
+            }
+        }
     }
 
     void Log(std::ostream& out) const {
@@ -61,6 +72,7 @@ private:
 
         _indexes.emplace(std::make_pair(member.Addr(), _matrix.size()));
         _matrix.emplace_back(std::vector<Member>(_matrix.size(), nullMember));
+        _fd.emplace_back(TimeStamp::Now());
 
         for (auto& row : _matrix) {
             row.push_back(nullMember);
@@ -76,16 +88,16 @@ int main(int argc, char** argv) {
     port_t port = (config.Containerization()) ? config.DockerPort() : config.Port();
     Socket socket{ioService, port, config.BufferSize()};
 
-    ThreadSaveQueue<nlohmann::json> jsonQ;
-    socket.RunJSONCatching(jsonQ);
+    ThreadSaveQueue<PullGossip> pullQ;
+    socket.RunObserving(pullQ);
 
     MemberMatrix matrix;
     while (true) {
         // TODO(AndreevSemen) : do it env var
-        auto jsons = jsonQ.Pop(10);
+        auto pulls = pullQ.Pop(config.ObserveNum());
 
-        for (const auto& json : jsons) {
-            matrix.Push(json);
+        for (auto& pull : pulls) {
+            matrix.Push(std::move(pull));
         }
 
         static TimeStamp logRepetition = TimeStamp::Now();
@@ -94,5 +106,7 @@ int main(int argc, char** argv) {
 
             logRepetition = TimeStamp::Now();
         }
+
+        matrix.DetectFailure(milliseconds{1500});
     }
 }

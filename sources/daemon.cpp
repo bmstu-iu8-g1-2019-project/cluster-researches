@@ -3,7 +3,6 @@
 #include <thread>
 
 #include <behavior.hpp>
-#include <observer.hpp>
 #include <queue.hpp>
 
 int main(int argc, char** argv) {

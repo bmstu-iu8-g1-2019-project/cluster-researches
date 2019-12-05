@@ -139,6 +139,14 @@ Config::Config(char* configPath, char* strIP, char* strPort) {
         std::cout << "Set default \"log-repetition\": " << _logRepetition.count() << std::endl;
     }
 
+    found = json.find("observe-num");
+    if (found != json.end()) {
+        _observeNum = json["observe-num"];
+    } else {
+        _observeNum = 100;
+        std::cout << "Set default \"observe-num\": " << _observeNum << std::endl;
+    }
+
     _pTable = std::make_unique<Table>(MemberAddr{_ip, _port}, _latestPartSize, _randomPartSize);
     for (const auto& jsonMember : json["entry-point"]) {
         auto member = Member{MemberAddr::FromJSON(jsonMember["address"])};
@@ -218,6 +226,10 @@ milliseconds Config::LogRepetition() const {
     return _logRepetition;
 }
 
+size_t Config::ObserveNum() const {
+    return _observeNum;
+}
+
 Table&& Config::MoveTable() {
     return std::move(*_pTable);
 }
@@ -251,7 +263,6 @@ void Socket::_GossipCatching(ThreadSaveQueue<PullGossip>& pings, ThreadSaveQueue
         }
 
         PullGossip gossip{protoGossip};
-        protoGossip.clear_table();
 
         switch (gossip.Type()) {
             case MessageType::Ping :
@@ -270,11 +281,18 @@ void Socket::_GossipCatching(ThreadSaveQueue<PullGossip>& pings, ThreadSaveQueue
     }
 }
 
-void Socket::_JSONCatching(ThreadSaveQueue<nlohmann::json>& jsons) {
+void Socket::_Observing(ThreadSaveQueue<PullGossip>& pulls) {
     while (true) {
         size_t receivedBytes = _socket.receive(boost::asio::buffer(_IBuffer));
 
-        jsons.Push(nlohmann::json::from_msgpack(_IBuffer.data(), receivedBytes));
+        Proto::Gossip protoGossip;
+        if (!protoGossip.ParseFromArray(_IBuffer.data(), receivedBytes)) {
+            continue;
+        }
+
+        PullGossip gossip{protoGossip};
+
+        pulls.Push(std::move(gossip));
     }
 }
 
@@ -283,8 +301,8 @@ void Socket::RunGossipCatching(ThreadSaveQueue<PullGossip>& pings, ThreadSaveQue
     catchingThread.detach();
 }
 
-void Socket::RunJSONCatching(ThreadSaveQueue<nlohmann::json>& jsons) {
-    std::thread catchingThread{&Socket::_JSONCatching, this, std::ref(jsons)};
+void Socket::RunObserving(ThreadSaveQueue<PullGossip>& pulls) {
+    std::thread catchingThread{&Socket::_Observing, this, std::ref(pulls)};
     catchingThread.detach();
 }
 
@@ -330,29 +348,13 @@ void Socket::Spread(Table& table, size_t destsNum) {
 }
 
 void Socket::NotifyObserver(const ip_v4& observerIP, port_t observerPort, const Table& table) {
-    auto json = nlohmann::json::object();
+    std::vector<size_t> indexes(table.Size(), 0);
+    std::iota(indexes.begin(), indexes.end(), 0);
 
-    json["owner"] = table.WhoAmI().ToJSON();
+    Proto::Gossip protoGossip = MakeProtoGossip(PushTable(table, std::move(indexes)), MessageType::Ping);
 
-    auto neighbours = nlohmann::json::array();
-    for (size_t i = 0; i < table.Size(); ++i) {
-        neighbours.push_back(table[i].ToJSON());
-    }
-    json["neighbours"] = std::move(neighbours);
-
-    endpoint observerEP{ip_v4{observerIP}, observerPort};
-    _socket.send_to(boost::asio::buffer(nlohmann::json::to_msgpack(json)), observerEP);
-}
-
-std::vector<size_t> GetIndexesToGossipOwners(const Table& table, const std::vector<PullGossip>& gossips) {
-    std::vector<size_t> indexes;
-    indexes.reserve(gossips.size());
-
-    for (const auto& gossip : gossips) {
-        indexes.push_back(table.ToIndex(gossip.Owner().Addr()));
-    }
-
-    return std::move(indexes);
+    SetDest(protoGossip, Member{MemberAddr{observerIP, observerPort}});
+    _SendProtoGossip(protoGossip);
 }
 
 void UpdateTable(Table& table, std::vector<PullGossip>& gossips) {

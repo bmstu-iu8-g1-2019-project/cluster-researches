@@ -14,9 +14,9 @@
 
   "fd-timeout" : 100,
   "fd-repetition" : 100,
-  "fd-failures-before-dead" : 2,
+  "fd-failures-before-dead" : 0,
 
-  "observer-ip" : "172.25.115.224",
+  "observer-ip" : "172.16.81.238",
   "observer-port" : 7999,
   "observe-repetition" : 100,
 
@@ -26,8 +26,8 @@
     {
       "host-info" : "semen",
       "address" : {
-        "ip" : "172.25.115.224",
-        "port" : 801
+        "ip" : "172.16.81.238",
+        "port" : 8001
       }
     }
   ]

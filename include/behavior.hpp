@@ -51,6 +51,8 @@ private:
 
     milliseconds _logRepetition;
 
+    size_t _observeNum;
+
     // начальная конфигурация таблицы
     std::unique_ptr<Table> _pTable;
 
@@ -83,6 +85,7 @@ public:
     const ip_v4& ObserverIP() const;
     port_t ObserverPort() const;
     milliseconds ObserveRepetition() const;
+    size_t ObserveNum() const;
 
     milliseconds LogRepetition() const;
 
@@ -103,7 +106,7 @@ private:
     // бесконечная функций, ловящая слухи и складывающая их в соответствующую очередь
     void _GossipCatching(ThreadSaveQueue<PullGossip>& pings, ThreadSaveQueue<PullGossip>& acks);
 
-    void _JSONCatching(ThreadSaveQueue<nlohmann::json>& jsons);
+    void _Observing(ThreadSaveQueue<PullGossip>& pulls);
 
 public:
     explicit Socket(io_service& ioService, uint16_t port, size_t bufferSize);
@@ -111,7 +114,7 @@ public:
     // запускает `_GossipCatching()` в отдельном потоке
     void RunGossipCatching(ThreadSaveQueue<PullGossip>& pings, ThreadSaveQueue<PullGossip>& acks);
 
-    void RunJSONCatching(ThreadSaveQueue<nlohmann::json>& jsons);
+    void RunObserving(ThreadSaveQueue<PullGossip>& pulls);
 
     // генерирует акки и отправляет нодам из `destIndexes`
     void SendAcks(Table& table);
@@ -122,8 +125,6 @@ public:
     // отправляет UDP-дейтаграмму `observer`
     void NotifyObserver(const ip_v4& observerIP, port_t observerPort, const Table& table);
 };
-
-std::vector<size_t> GetIndexesToGossipOwners(const Table& table, const std::vector<PullGossip>& gossips);
 
 void UpdateTable(Table& table, std::vector<PullGossip>& gossips);
 

@@ -75,7 +75,7 @@ void Table::Update(const Member& member) {
     if (member.Addr() == WhoAmI().Addr()) {
         if ((member.Info().Status() == MemberInfo::Suspicious ||
             member.Info().Status() == MemberInfo::Dead) &&
-            !_me.Info().IsIncarnationMoreThan(member.Info()))    {
+            !_me.Info().IsIncarnationMoreThan(member.Info())) {
             _me.Info().IncreaseIncarnation();
         }
 
@@ -144,13 +144,15 @@ void Table::DetectFailures(milliseconds msTimeout, size_t failuresBeforeDead) {
                 break;
             // поменялось на Suspicious
             case MemberInfo::Suspicious :
-                if (_members[index].Info().Status() != MemberInfo::Suspicious) {
+                // мы не можем улучшить состояние ноды,
+                // пока она сама не установит новую инкарнацию
+                if (_members[index].Info().Status() < MemberInfo::Suspicious) {
                     _NewEvent(index, MemberInfo::Suspicious);
                 }
                 break;
             // поменялось на Dead
             case MemberInfo::Dead :
-                if (_members[index].Info().Status() != MemberInfo::Dead) {
+                if (_members[index].Info().Status() < MemberInfo::Dead) {
                     _NewEvent(index, MemberInfo::Dead);
                 }
                 break;

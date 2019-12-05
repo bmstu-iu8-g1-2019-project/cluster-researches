@@ -177,6 +177,7 @@ public:
     explicit Member(const Proto::Member& member);
     Proto::Member ToProtoType() const;
 
+    Member& operator=(const Member& rhs) = default;
     Member& operator=(Member&& rhs) noexcept;
 
     // функции преобразования для `JSON`
