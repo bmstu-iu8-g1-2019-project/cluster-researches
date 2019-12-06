@@ -280,6 +280,10 @@ MemberInfo::NodeState& MemberInfo::Status() {
     return const_cast<NodeState&>(const_cast<const MemberInfo*>(this)->Status());
 }
 
+const incarnation_t& MemberInfo::Incarnation() const {
+    return _incarnation;
+}
+
 const TimeStamp& MemberInfo::LatestUpdate() const {
     return _TS_updated;
 }

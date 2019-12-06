@@ -32,6 +32,10 @@ public:
 
         return std::move(pops);
     }
+
+    size_t Size() const {
+        return _queue.size();
+    }
 };
 
 #endif // INCLUDE_QUEUE_HPP_

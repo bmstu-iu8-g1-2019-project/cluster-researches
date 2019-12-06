@@ -1,5 +1,6 @@
 // Copyright 2019 AndreevSemen semen.andreev00@mail.ru
 
+#include <config.hpp>
 #include <behavior.hpp>
 
 class MemberMatrix {
@@ -9,7 +10,15 @@ private:
 
     std::vector<TimeStamp> _fd;
 
+    Member _nullMember;
+
 public:
+    MemberMatrix()
+      : _nullMember{MemberAddr{ip_v4::from_string("0.0.0.0"), 0}}
+    {
+        _nullMember.Info().Status() = MemberInfo::Dead;
+    }
+
     void Push(PullGossip&& pull) {
         if (!_IsInMatrix(pull.Owner())) {
             _NewRow(pull.Owner());
@@ -35,32 +44,39 @@ public:
         for (size_t i = 0; i < _fd.size(); ++i) {
             if (_fd[i].Time() != milliseconds{0} &&
                 _fd[i].TimeDistance(TimeStamp::Now()) > timeout) {
-                _matrix[i][i].Info().Status() = MemberInfo::Dead;
                 _fd[i] = TimeStamp{milliseconds{0}};
-                std::cout << "Detected failure" << std::endl;
+
+                for (auto& member : _matrix[i]) {
+                    member.Info().Status() = MemberInfo::Dead;
+                }
             }
         }
     }
 
     void Log(std::ostream& out) const {
-        for (const auto& row : _matrix) {
-            for (const auto& element : row) {
-                switch (element.Info().Status()) {
+        system("clear");
+        for (auto i = 0; i < _matrix.size(); ++i) {
+            for (auto j = 0; j < _matrix.front().size(); ++j) {
+                switch (_matrix[i][j].Info().Status()) {
                     case MemberInfo::Alive :
-                        out << " ";
+                        out << "\033[0;32mA\033[0m";
                         break;
                     case MemberInfo::Suspicious :
-                        out << "s";
+                        out << "\033[0;33mS\033[0m";
                         break;
                     case MemberInfo::Dead :
-                        out << "D";
+                        out << "\033[1;31mF\033[0m";
                 }
-                out << "|";
+                out << " ";
             }
-            out << std::endl;
+            out << " Member " << i << " : " << _matrix[i][i].ToJSON()
+                << std::endl;
         }
-        out << std::endl;
+        out << "Cluster size : " << _matrix.size()
+            << std::endl;
     }
+
+
 
 private:
     bool _IsInMatrix(const Member& member) const {
@@ -68,14 +84,12 @@ private:
     }
 
     void _NewRow(const Member& member) {
-        static Member nullMember{MemberAddr{ip_v4::from_string("0.0.0.0"), 0}};
-
         _indexes.emplace(std::make_pair(member.Addr(), _matrix.size()));
-        _matrix.emplace_back(std::vector<Member>(_matrix.size(), nullMember));
+        _matrix.emplace_back(std::vector<Member>(_matrix.size(), _nullMember));
         _fd.emplace_back(TimeStamp::Now());
 
         for (auto& row : _matrix) {
-            row.push_back(nullMember);
+            row.push_back(_nullMember);
         }
     }
 };
@@ -93,7 +107,6 @@ int main(int argc, char** argv) {
 
     MemberMatrix matrix;
     while (true) {
-        // TODO(AndreevSemen) : do it env var
         auto pulls = pullQ.Pop(config.ObserveNum());
 
         for (auto& pull : pulls) {
@@ -107,6 +120,8 @@ int main(int argc, char** argv) {
             logRepetition = TimeStamp::Now();
         }
 
-        matrix.DetectFailure(milliseconds{1500});
+        matrix.DetectFailure(config.ObserverFDTimout());
+
+
     }
 }

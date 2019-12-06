@@ -54,6 +54,9 @@ add_library(types STATIC
   ${CMAKE_CURRENT_SOURCE_DIR}/sources/table.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/sources/gossip.cpp
 )
+add_library(config STATIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/sources/config.cpp
+)
 add_library(behavior
   ${CMAKE_CURRENT_SOURCE_DIR}/sources/behavior.cpp
 )
@@ -63,10 +66,15 @@ add_executable(gossip-observer
 add_executable(gossip-daemon
   ${CMAKE_CURRENT_SOURCE_DIR}/sources/daemon.cpp
 )
+add_executable(gossip-killer
+  ${CMAKE_CURRENT_SOURCE_DIR}/sources/killer.cpp
+)
 
 
 target_include_directories(types
-  PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_include_directories(config
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_include_directories(behavior
@@ -78,6 +86,9 @@ target_include_directories(gossip-observer
 target_include_directories(gossip-daemon
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+target_include_directories(gossip-killer
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
 
 target_link_libraries(types
@@ -85,17 +96,29 @@ target_link_libraries(types
   PUBLIC protobuf
   PUBLIC nlohmann_json::nlohmann_json
 )
+target_link_libraries(config
+  PUBLIC types
+)
 target_link_libraries(behavior
   PUBLIC types
   PUBLIC nlohmann_json::nlohmann_json
 )
 target_link_libraries(gossip-observer
   PUBLIC types
+  PUBLIC config
   PUBLIC behavior
   PUBLIC Boost::system
 )
 target_link_libraries(gossip-daemon
+  PUBLIC types
+  PUBLIC config
   PUBLIC behavior
   PUBLIC -pthread
 )
+target_link_libraries(gossip-killer
+  PUBLIC types
+  PUBLIC config
+  PUBLIC behavior
+)
+
 

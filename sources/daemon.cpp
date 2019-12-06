@@ -2,12 +2,15 @@
 
 #include <thread>
 
+#include <config.hpp>
 #include <behavior.hpp>
 #include <queue.hpp>
 
 int main(int argc, char** argv) {
     if (argc < 3) {
-        return 1;
+        throw std::invalid_argument{
+            "less arguments"
+        };
     }
 
     Config conf{argv[1], argv[2], argv[3]};
@@ -19,17 +22,24 @@ int main(int argc, char** argv) {
 
     ThreadSaveQueue<PullGossip> pingQ;
     ThreadSaveQueue<PullGossip> ackQ;
-    socket.RunGossipCatching(pingQ, ackQ);
+    ThreadSaveQueue<PullGossip> observerCommands;
+    socket.RunGossipCatching(pingQ, ackQ, observerCommands,
+                             MemberAddr{conf.ObserverIP(), conf.ObserverPort()});
 
     Table table{conf.MoveTable()};
     while (true) {
+        /// Observer control
+        {
+            ExecuteObserverCommands(observerCommands);
+        }
+
         /// Updating table with ping-pulls
         {
             auto pings = pingQ.Pop(conf.PingProcessingNum());
             UpdateTable(table, pings);
         }
 
-        // Sending push-acks
+        /// Sending push-acks
         {
             socket.SendAcks(table);
         }
@@ -48,7 +58,7 @@ int main(int argc, char** argv) {
             lastSpread = TimeStamp::Now();
         }
 
-        // Detecting failures
+        /// Detecting failures
         static TimeStamp lastTimeoutCheck{TimeStamp::Now()};
 
         if (lastTimeoutCheck.TimeDistance(TimeStamp::Now()) > conf.FDRepetition()) {
@@ -56,7 +66,7 @@ int main(int argc, char** argv) {
             lastTimeoutCheck = TimeStamp::Now();
         }
 
-        // Notifying observer
+        /// Notifying observer
         static TimeStamp lastObserve{TimeStamp::Now()};
 
         if (lastObserve.TimeDistance(TimeStamp::Now()) > conf.ObserveRepetition()) {
