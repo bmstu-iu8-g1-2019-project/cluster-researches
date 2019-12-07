@@ -101,9 +101,9 @@ public:
     const Member& WhoAmI() const;
 
     // обновляет таблицу информацией об одной ноде
-    void Update(const Member& member);
+    bool Update(const Member& member);
     // возвращает список индексов на конфликтные члены
-    void Update(PullTable&& table);
+    bool Update(PullTable&& table);
 
     // установка ожидания акка и его сброс
     void SetAckWaitingFrom(size_t index);

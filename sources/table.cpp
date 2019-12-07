@@ -69,7 +69,7 @@ const Member& Table::WhoAmI() const {
     return _me;
 }
 
-void Table::Update(const Member& member) {
+bool Table::Update(const Member& member) {
     // если известно, что другая нода думает, что мы мертвы или
     // подозрительны, то необходимо увеличить инкарнацию
     if (member.Addr() == WhoAmI().Addr()) {
@@ -79,7 +79,7 @@ void Table::Update(const Member& member) {
             _me.Info().IncreaseIncarnation();
         }
 
-        return;
+        return true;
     }
 
     // поиск ноды в `_members`
@@ -90,7 +90,7 @@ void Table::Update(const Member& member) {
         _Insert(member);
         _InsertInLatest(ToIndex(member.Addr()));
 
-        return;
+        return true;
     }
 
     // `knownMember` -- информация о `member` из `this->_members`
@@ -102,30 +102,37 @@ void Table::Update(const Member& member) {
         knownMember.Info() = member.Info();
         _InsertInLatest(ToIndex(member.Addr()));
 
-        return;
+        return true;
     }
 
     // если информация страее, чем наша, то мы игнорируем ее
     if (member.Info().LatestUpdate(). OlderThan (knownMember.Info().LatestUpdate())) {
-        return;
+        return false;
     }
 
     // если конфликт состояний члена кластера
     // она возникает, если `member->Status()` лучше, чем `knownMember->Status()`
     // не верим данному слуху
     if (member.Info(). IsStatusBetterThan (knownMember.Info())) {
-        return;
+        return false;
     }
 
     // все остальные случаи являются валидными, ими нужно обновить таблицу
     knownMember.Info() = member.Info();
     _InsertInLatest(ToIndex(member.Addr()));
+
+    return true;
 }
 
-void Table::Update(PullTable&& pullTable) {
+bool Table::Update(PullTable&& pullTable) {
+    bool isUpdated = false;
     for (size_t i = 0; i < pullTable.Size(); ++i) {
-        Update(pullTable[i]);
+        if (Update(pullTable[i])) {
+            isUpdated = true;
+        }
     }
+
+    return isUpdated;
 }
 
 void Table::SetAckWaitingFrom(size_t index) {

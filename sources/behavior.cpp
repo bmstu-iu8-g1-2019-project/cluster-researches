@@ -71,6 +71,32 @@ void Socket::_Observing(ThreadSaveQueue<PullGossip>& pulls) {
     }
 }
 
+void Socket::_Killer(Member observer) {
+    Proto::Gossip protoGossip;
+    protoGossip.set_type(Proto::Gossip::Ping);
+    protoGossip.set_allocated_owner(new Proto::Member{observer.ToProtoType()});
+    protoGossip.set_allocated_table(new Proto::Table{});
+
+    while (true) {
+        std::cout << "Sacrifice address : ";
+        std::string sacrificeAddress;
+        std::cin >> sacrificeAddress;
+
+        std::cout << "Sacrifice port : ";
+        port_t sacrificePort;
+        std::cin >> sacrificePort;
+
+        Member dest{MemberAddr{ip_v4::from_string(sacrificeAddress), sacrificePort}};
+
+        SetDest(protoGossip, dest);
+        SendProtoGossip(protoGossip);
+
+        std::cout << "Sent command at : " << TimeStamp::Now().Time().count()
+                  << std::endl
+                  << std::endl;
+    }
+}
+
 void Socket::RunGossipCatching(ThreadSaveQueue<PullGossip>& pings,
                                ThreadSaveQueue<PullGossip>& acks,
                                ThreadSaveQueue<PullGossip>& observerCommands,
@@ -85,6 +111,11 @@ void Socket::RunGossipCatching(ThreadSaveQueue<PullGossip>& pings,
 void Socket::RunObserving(ThreadSaveQueue<PullGossip>& pulls) {
     std::thread catchingThread{&Socket::_Observing, this, std::ref(pulls)};
     catchingThread.detach();
+}
+
+void Socket::RunKiller(Member observer) {
+    std::thread killerThread{&Socket::_Killer, this, observer};
+    killerThread.detach();
 }
 
 void Socket::SendAcks(Table& table) {
@@ -154,15 +185,18 @@ void ExecuteObserverCommands(ThreadSaveQueue<PullGossip>& observerCommands) {
     }
 }
 
-void UpdateTable(Table& table, std::vector<PullGossip>& gossips) {
+bool UpdateTable(Table& table, std::vector<PullGossip>& gossips) {
+    bool isUpdated = false;
     for (auto& gossip : gossips) {
         // обновление себя (может только увеличиться инкарнация)
-        table.Update(gossip.Dest());
-        table.Update(gossip.Owner());
-        table.Update(gossip.MoveTable());
+        isUpdated = table.Update(gossip.Dest()) || isUpdated;
+        isUpdated = table.Update(gossip.Owner()) || isUpdated;
+        isUpdated = table.Update(gossip.MoveTable()) || isUpdated;
 
         table.SetAckWaiter(table.ToIndex(gossip.Owner().Addr()));
     }
+
+    return isUpdated;
 }
 
 void SetDest(Proto::Gossip& protoGossip, const Member& dest) {

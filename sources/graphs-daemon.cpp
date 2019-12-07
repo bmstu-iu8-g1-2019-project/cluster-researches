@@ -14,9 +14,7 @@ int main(int argc, char** argv) {
     Config conf{argv[1], argv[2], argv[3]};
 
     io_service ioService;
-    port_t port = (conf.Containerization()) ? conf.DockerPort() : conf.Port();
-    std::cout << "Binded on port : " << port << std::endl;
-    Socket socket(ioService, port, conf.BufferSize());
+    Socket socket(ioService, conf.Port(), conf.BufferSize());
 
     ThreadSaveQueue<PullGossip> pingQ;
     ThreadSaveQueue<PullGossip> ackQ;
@@ -34,7 +32,9 @@ int main(int argc, char** argv) {
         /// Updating table with ping-pulls
         {
             auto pings = pingQ.Pop(conf.PingProcessingNum());
-            UpdateTable(table, pings);
+            if (UpdateTable(table, pings)) {
+                socket.NotifyObserver(conf.ObserverIP(), conf.ObserverPort(), table);
+            }
         }
 
         /// Sending push-acks
@@ -62,13 +62,6 @@ int main(int argc, char** argv) {
         if (lastTimeoutCheck.TimeDistance(TimeStamp::Now()) > conf.FDRepetition()) {
             table.DetectFailures(conf.FDTimout(), conf.FailuresBeforeDead());
             lastTimeoutCheck = TimeStamp::Now();
-        }
-
-        /// Notifying observer
-        static TimeStamp lastObserve{TimeStamp::Now()};
-
-        if (lastObserve.TimeDistance(TimeStamp::Now()) > conf.ObserveRepetition()) {
-            socket.NotifyObserver(conf.ObserverIP(), conf.ObserverPort(), table);
         }
     }
 }

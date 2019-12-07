@@ -2,18 +2,19 @@
 
 exec_path=$1
 echo ${exec_path}
-shift
 
-config_path=$1
+config_path=$2
 echo ${config_path}
-shift
 
-ip=$1
+ip=$3
 echo ${ip}
-shift
 
-for port in "$@"
+first_port=$4
+last_port=$5
+
+for (( port=${first_port}; port<last_port; port++ ))
 do
+    echo ${port}
     exec ${exec_path} ${config_path} ${ip} ${port} > daemon-log${ip}:${port}.txt &
     shift
 done

@@ -37,5 +37,19 @@ cmake . && make
 
 Запуск кластера:
 ```shell script
-..
+./up-cluster ./gossip-daemon ./processing-daemon-config.json <ip> <ports>...
+
+# к примеру:
+./up-cluster ./gossip-daemon ./processing-daemon-config.json 127.0.0.1
+```
+
+
+Запуск обзервера:
+```shell script
+./gossip-observer ./processing-observer-config.json <ip> <port>
+```
+
+Запуск киллера:
+```shell script
+./killer ./processing-observer-config.json <ip> <port>
 ```

@@ -60,6 +60,9 @@ add_library(config STATIC
 add_library(behavior
   ${CMAKE_CURRENT_SOURCE_DIR}/sources/behavior.cpp
 )
+add_library(matrix STATIC
+   ${CMAKE_CURRENT_SOURCE_DIR}/sources/matrix.cpp
+)
 add_executable(gossip-observer
   ${CMAKE_CURRENT_SOURCE_DIR}/sources/observer.cpp
 )
@@ -68,6 +71,12 @@ add_executable(gossip-daemon
 )
 add_executable(gossip-killer
   ${CMAKE_CURRENT_SOURCE_DIR}/sources/killer.cpp
+)
+add_executable(gossip-graphs-observer
+  ${CMAKE_CURRENT_SOURCE_DIR}/sources/graphs-observer.cpp
+)
+add_executable(gossip-graphs-daemon
+  ${CMAKE_CURRENT_SOURCE_DIR}/sources/graphs-daemon.cpp
 )
 
 
@@ -80,6 +89,9 @@ target_include_directories(config
 target_include_directories(behavior
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+target_include_directories(matrix
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 target_include_directories(gossip-observer
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
@@ -87,6 +99,12 @@ target_include_directories(gossip-daemon
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_include_directories(gossip-killer
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_include_directories(gossip-graphs-observer
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_include_directories(gossip-graphs-daemon
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
@@ -103,7 +121,11 @@ target_link_libraries(behavior
   PUBLIC types
   PUBLIC nlohmann_json::nlohmann_json
 )
+target_link_libraries(matrix
+  PUBLIC types
+)
 target_link_libraries(gossip-observer
+  PUBLIC matrix
   PUBLIC types
   PUBLIC config
   PUBLIC behavior
@@ -120,5 +142,19 @@ target_link_libraries(gossip-killer
   PUBLIC config
   PUBLIC behavior
 )
+target_link_libraries(gossip-graphs-observer
+  PUBLIC matrix
+  PUBLIC types
+  PUBLIC config
+  PUBLIC behavior
+  PUBLIC Boost::system
+)
+target_link_libraries(gossip-graphs-daemon
+  PUBLIC types
+  PUBLIC config
+  PUBLIC behavior
+  PUBLIC -pthread
+)
+
 
 

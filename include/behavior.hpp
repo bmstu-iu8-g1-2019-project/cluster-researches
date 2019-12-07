@@ -31,6 +31,8 @@ private:
 
     void _Observing(ThreadSaveQueue<PullGossip>& pulls);
 
+    void _Killer(Member observer);
+
 public:
     explicit Socket(io_service& ioService, uint16_t port, size_t bufferSize);
 
@@ -41,6 +43,8 @@ public:
                            MemberAddr observerAddress);
 
     void RunObserving(ThreadSaveQueue<PullGossip>& pulls);
+
+    void RunKiller(Member observer);
 
     // отправка ЗАПОЛНЕННОГО `Proto::Gossip`
     void SendProtoGossip(const Proto::Gossip& protoGossip);
@@ -57,7 +61,7 @@ public:
 
 void ExecuteObserverCommands(ThreadSaveQueue<PullGossip>& observerCommands);
 
-void UpdateTable(Table& table, std::vector<PullGossip>& gossips);
+bool UpdateTable(Table& table, std::vector<PullGossip>& gossips);
 
 void SetDest(Proto::Gossip& protoGossip, const Member& dest);
 
